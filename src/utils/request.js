@@ -60,7 +60,7 @@ request.interceptors.response.use(
 
     try {
       const refreshResponse = await refreshAccessToken()
-      const nextAccessToken = refreshResponse.data?.data?.accessToken
+      const nextAccessToken = refreshResponse.data?.accessToken
 
       if (!nextAccessToken) {
         throw new Error('refresh access token failed')

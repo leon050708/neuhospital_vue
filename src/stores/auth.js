@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 
-import { login as loginApi, logout as logoutApi, getCurrentUser } from '@/api/auth'
+import { login as loginApi, logout as logoutApi, getCurrentUser, register as registerApi } from '@/api/auth'
 import {
   clearAuthStorage,
   getAccessToken,
@@ -52,8 +52,12 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function login(credentials) {
     const response = await loginApi(credentials)
-    applyAuthPayload(response.data)
-    return response.data
+    applyAuthPayload(response)
+    return response
+  }
+
+  async function register(payload) {
+    return registerApi(payload)
   }
 
   async function ensureProfile() {
@@ -66,7 +70,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     const response = await getCurrentUser()
-    profile.value = response.data
+    profile.value = response
     profileLoaded.value = true
 
     setAuthStorage({
@@ -117,6 +121,7 @@ export const useAuthStore = defineStore('auth', () => {
     hydrate,
     applyAuthPayload,
     login,
+    register,
     ensureProfile,
     logout,
     updateAccessToken,

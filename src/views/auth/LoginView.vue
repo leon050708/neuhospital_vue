@@ -10,19 +10,68 @@ const route = useRoute()
 const router = useRouter()
 
 const loading = ref(false)
-const formRef = ref()
+const loginFormRef = ref()
+const registerFormRef = ref()
+const activePanel = ref('login')
 
-const form = reactive({
+const loginForm = reactive({
   username: '',
   password: ''
 })
 
-const rules = {
+const registerForm = reactive({
+  username: '',
+  password: '',
+  confirmPassword: '',
+  realName: '',
+  phone: '',
+  idCard: '',
+  gender: 'MALE'
+})
+
+const loginRules = {
   username: [
     { required: true, message: '请输入账号', trigger: 'blur' }
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' }
+  ]
+}
+
+const registerRules = {
+  username: [
+    { required: true, message: '请输入注册账号', trigger: 'blur' },
+    { min: 4, message: '账号至少 4 位', trigger: 'blur' }
+  ],
+  password: [
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, message: '密码至少 6 位', trigger: 'blur' }
+  ],
+  confirmPassword: [
+    { required: true, message: '请再次输入密码', trigger: 'blur' },
+    {
+      validator: (_, value, callback) => {
+        if (value !== registerForm.password) {
+          callback(new Error('两次输入的密码不一致'))
+          return
+        }
+
+        callback()
+      },
+      trigger: 'blur'
+    }
+  ],
+  realName: [
+    { required: true, message: '请输入真实姓名', trigger: 'blur' }
+  ],
+  phone: [
+    { required: true, message: '请输入手机号', trigger: 'blur' }
+  ],
+  idCard: [
+    { required: true, message: '请输入身份证号', trigger: 'blur' }
+  ],
+  gender: [
+    { required: true, message: '请选择性别', trigger: 'change' }
   ]
 }
 
@@ -43,7 +92,7 @@ function resolveHomeByUserType(userType) {
 }
 
 async function handleLogin() {
-  const valid = await formRef.value?.validate().catch(() => false)
+  const valid = await loginFormRef.value?.validate().catch(() => false)
 
   if (!valid) {
     return
@@ -52,11 +101,48 @@ async function handleLogin() {
   loading.value = true
 
   try {
-    const payload = await authStore.login(form)
+    const payload = await authStore.login(loginForm)
     ElMessage.success('登录成功')
     router.push(route.query.redirect || resolveHomeByUserType(payload.userType))
   } catch (error) {
     ElMessage.error(error.response?.data?.message || '登录失败，请检查账号密码')
+  } finally {
+    loading.value = false
+  }
+}
+
+async function handleRegister() {
+  const valid = await registerFormRef.value?.validate().catch(() => false)
+
+  if (!valid) {
+    return
+  }
+
+  loading.value = true
+
+  try {
+    await authStore.register({
+      username: registerForm.username,
+      password: registerForm.password,
+      realName: registerForm.realName,
+      phone: registerForm.phone,
+      idCard: registerForm.idCard,
+      gender: registerForm.gender
+    })
+
+    loginForm.username = registerForm.username
+    loginForm.password = registerForm.password
+
+    registerForm.confirmPassword = ''
+    registerForm.realName = ''
+    registerForm.phone = ''
+    registerForm.idCard = ''
+    registerForm.gender = 'MALE'
+
+    ElMessage.success('注册成功，请直接登录')
+    activePanel.value = 'login'
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || '注册失败，请检查填写内容')
   } finally {
     loading.value = false
   }
@@ -99,18 +185,51 @@ async function handleLogin() {
       <div class="panel-corner panel-corner-left"></div>
       <div class="panel-corner panel-corner-right"></div>
       <div class="login-head">
-        <div class="hud-label">Portal Sign In</div>
-        <h2>登录系统</h2>
-        <p>输入后端账号密码后，系统会根据 `userType` 自动进入对应业务端。</p>
+        <div class="hud-label">{{ activePanel === 'login' ? 'Portal Sign In' : 'Patient Register' }}</div>
+        <h2>{{ activePanel === 'login' ? '登录系统' : '患者注册' }}</h2>
+        <p>
+          {{
+            activePanel === 'login'
+              ? '输入后端账号密码后，系统会根据 `userType` 自动进入对应业务端。'
+              : '按最新 API.md，患者可以自主注册账号，注册成功后再进入登录。'
+          }}
+        </p>
       </div>
 
-      <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
+      <div class="panel-switch">
+        <button
+          class="switch-button"
+          :class="{ 'is-active': activePanel === 'login' }"
+          @click="activePanel = 'login'"
+        >
+          登录
+        </button>
+        <button
+          class="switch-button"
+          :class="{ 'is-active': activePanel === 'register' }"
+          @click="activePanel = 'register'"
+        >
+          注册
+        </button>
+      </div>
+
+      <el-form
+        v-if="activePanel === 'login'"
+        ref="loginFormRef"
+        :model="loginForm"
+        :rules="loginRules"
+        label-position="top"
+      >
         <el-form-item label="账号" prop="username">
-          <el-input v-model="form.username" placeholder="例如 doctor001 / admin001" size="large" />
+          <el-input
+            v-model="loginForm.username"
+            placeholder="例如 doctor001 / admin001"
+            size="large"
+          />
         </el-form-item>
         <el-form-item label="密码" prop="password">
           <el-input
-            v-model="form.password"
+            v-model="loginForm.password"
             placeholder="请输入密码"
             size="large"
             show-password
@@ -128,11 +247,72 @@ async function handleLogin() {
         </el-button>
       </el-form>
 
+      <el-form
+        v-else
+        ref="registerFormRef"
+        :model="registerForm"
+        :rules="registerRules"
+        label-position="top"
+      >
+        <div class="register-grid">
+          <el-form-item label="注册账号" prop="username">
+            <el-input v-model="registerForm.username" placeholder="请输入注册账号" size="large" />
+          </el-form-item>
+          <el-form-item label="真实姓名" prop="realName">
+            <el-input v-model="registerForm.realName" placeholder="请输入真实姓名" size="large" />
+          </el-form-item>
+          <el-form-item label="密码" prop="password">
+            <el-input
+              v-model="registerForm.password"
+              placeholder="请输入密码"
+              size="large"
+              show-password
+            />
+          </el-form-item>
+          <el-form-item label="确认密码" prop="confirmPassword">
+            <el-input
+              v-model="registerForm.confirmPassword"
+              placeholder="请再次输入密码"
+              size="large"
+              show-password
+            />
+          </el-form-item>
+          <el-form-item label="手机号" prop="phone">
+            <el-input v-model="registerForm.phone" placeholder="请输入手机号" size="large" />
+          </el-form-item>
+          <el-form-item label="身份证号" prop="idCard">
+            <el-input v-model="registerForm.idCard" placeholder="请输入身份证号" size="large" />
+          </el-form-item>
+        </div>
+
+        <el-form-item label="性别" prop="gender">
+          <el-segmented
+            v-model="registerForm.gender"
+            :options="[
+              { label: '男', value: 'MALE' },
+              { label: '女', value: 'FEMALE' }
+            ]"
+          />
+        </el-form-item>
+
+        <el-button
+          class="login-button"
+          type="primary"
+          size="large"
+          :loading="loading"
+          @click="handleRegister"
+        >
+          创建患者账号
+        </el-button>
+      </el-form>
+
       <div class="login-tips">
         <span>已对接接口：</span>
+        <code>/api/auth/register</code>
         <code>/api/auth/login</code>
         <code>/api/auth/refresh</code>
         <code>/api/auth/logout</code>
+        <code>/api/auth/me</code>
       </div>
     </section>
   </div>
@@ -279,6 +459,37 @@ async function handleLogin() {
   line-height: 1.8;
 }
 
+.panel-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.switch-button {
+  padding: 12px 14px;
+  border: 1px solid rgba(121, 189, 224, 0.16);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.48);
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.switch-button.is-active {
+  border-color: rgba(121, 189, 224, 0.34);
+  background: linear-gradient(135deg, rgba(121, 189, 224, 0.22) 0%, rgba(111, 200, 184, 0.18) 100%);
+  color: var(--text-primary);
+}
+
+.register-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 14px;
+}
+
 .login-button {
   width: 100%;
   margin-top: 12px;
@@ -316,6 +527,10 @@ async function handleLogin() {
 
   .login-grid {
     inset: 20px;
+  }
+
+  .register-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>
