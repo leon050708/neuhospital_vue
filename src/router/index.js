@@ -46,6 +46,46 @@ const routes = [
         }
       },
       {
+        path: 'patient/profile',
+        name: 'patient-profile',
+        component: () => import('@/views/patient/PatientProfileView.vue'),
+        meta: {
+          requiresAuth: true,
+          userTypes: ['PATIENT'],
+          title: '患者档案'
+        }
+      },
+      {
+        path: 'patient/registration',
+        name: 'patient-registration',
+        component: () => import('@/views/patient/PatientRegistrationView.vue'),
+        meta: {
+          requiresAuth: true,
+          userTypes: ['PATIENT'],
+          title: '挂号排班'
+        }
+      },
+      {
+        path: 'patient/orders',
+        name: 'patient-orders',
+        component: () => import('@/views/patient/PatientOrdersView.vue'),
+        meta: {
+          requiresAuth: true,
+          userTypes: ['PATIENT'],
+          title: '订单支付'
+        }
+      },
+      {
+        path: 'patient/consult',
+        name: 'patient-consult',
+        component: () => import('@/views/patient/PatientConsultView.vue'),
+        meta: {
+          requiresAuth: true,
+          userTypes: ['PATIENT'],
+          title: 'AI 问诊'
+        }
+      },
+      {
         path: 'doctor',
         name: 'doctor-home',
         component: () => import('@/views/doctor/DoctorHomeView.vue'),
@@ -53,6 +93,36 @@ const routes = [
           requiresAuth: true,
           userTypes: ['DOCTOR'],
           title: '医生端'
+        }
+      },
+      {
+        path: 'doctor/queue',
+        name: 'doctor-queue',
+        component: () => import('@/views/doctor/DoctorQueueView.vue'),
+        meta: {
+          requiresAuth: true,
+          userTypes: ['DOCTOR'],
+          title: '候诊队列'
+        }
+      },
+      {
+        path: 'doctor/records',
+        name: 'doctor-records',
+        component: () => import('@/views/doctor/DoctorRecordsView.vue'),
+        meta: {
+          requiresAuth: true,
+          userTypes: ['DOCTOR'],
+          title: '病历诊断'
+        }
+      },
+      {
+        path: 'doctor/orders',
+        name: 'doctor-orders',
+        component: () => import('@/views/doctor/DoctorOrdersView.vue'),
+        meta: {
+          requiresAuth: true,
+          userTypes: ['DOCTOR'],
+          title: '检查处方'
         }
       },
       {
@@ -73,6 +143,46 @@ const routes = [
           requiresAuth: true,
           userTypes: ['MANAGEMENT'],
           title: '管理端'
+        }
+      },
+      {
+        path: 'management/departments',
+        name: 'management-departments',
+        component: () => import('@/views/management/ManagementDepartmentsView.vue'),
+        meta: {
+          requiresAuth: true,
+          userTypes: ['MANAGEMENT'],
+          title: '科室医生管理'
+        }
+      },
+      {
+        path: 'management/schedules',
+        name: 'management-schedules',
+        component: () => import('@/views/management/ManagementSchedulesView.vue'),
+        meta: {
+          requiresAuth: true,
+          userTypes: ['MANAGEMENT'],
+          title: '排班号源管理'
+        }
+      },
+      {
+        path: 'management/patients',
+        name: 'management-patients',
+        component: () => import('@/views/management/ManagementPatientsView.vue'),
+        meta: {
+          requiresAuth: true,
+          userTypes: ['MANAGEMENT'],
+          title: '患者挂号管理'
+        }
+      },
+      {
+        path: 'management/assets',
+        name: 'management-assets',
+        component: () => import('@/views/management/ManagementAssetsView.vue'),
+        meta: {
+          requiresAuth: true,
+          userTypes: ['MANAGEMENT'],
+          title: '资产文件管理'
         }
       }
     ]
@@ -100,6 +210,46 @@ const routes = [
         }
       },
       {
+        path: 'patient/profile',
+        name: 'preview-patient-profile',
+        component: () => import('@/views/patient/PatientProfileView.vue'),
+        meta: {
+          preview: true,
+          previewUserType: 'PATIENT',
+          title: '患者档案预览'
+        }
+      },
+      {
+        path: 'patient/registration',
+        name: 'preview-patient-registration',
+        component: () => import('@/views/patient/PatientRegistrationView.vue'),
+        meta: {
+          preview: true,
+          previewUserType: 'PATIENT',
+          title: '挂号排班预览'
+        }
+      },
+      {
+        path: 'patient/orders',
+        name: 'preview-patient-orders',
+        component: () => import('@/views/patient/PatientOrdersView.vue'),
+        meta: {
+          preview: true,
+          previewUserType: 'PATIENT',
+          title: '订单支付预览'
+        }
+      },
+      {
+        path: 'patient/consult',
+        name: 'preview-patient-consult',
+        component: () => import('@/views/patient/PatientConsultView.vue'),
+        meta: {
+          preview: true,
+          previewUserType: 'PATIENT',
+          title: 'AI 问诊预览'
+        }
+      },
+      {
         path: 'doctor',
         name: 'preview-doctor',
         component: () => import('@/views/doctor/DoctorHomeView.vue'),
@@ -107,6 +257,36 @@ const routes = [
           preview: true,
           previewUserType: 'DOCTOR',
           title: '医生端预览'
+        }
+      },
+      {
+        path: 'doctor/queue',
+        name: 'preview-doctor-queue',
+        component: () => import('@/views/doctor/DoctorQueueView.vue'),
+        meta: {
+          preview: true,
+          previewUserType: 'DOCTOR',
+          title: '候诊队列预览'
+        }
+      },
+      {
+        path: 'doctor/records',
+        name: 'preview-doctor-records',
+        component: () => import('@/views/doctor/DoctorRecordsView.vue'),
+        meta: {
+          preview: true,
+          previewUserType: 'DOCTOR',
+          title: '病历诊断预览'
+        }
+      },
+      {
+        path: 'doctor/orders',
+        name: 'preview-doctor-orders',
+        component: () => import('@/views/doctor/DoctorOrdersView.vue'),
+        meta: {
+          preview: true,
+          previewUserType: 'DOCTOR',
+          title: '检查处方预览'
         }
       },
       {
@@ -127,6 +307,46 @@ const routes = [
           preview: true,
           previewUserType: 'MANAGEMENT',
           title: '管理端预览'
+        }
+      },
+      {
+        path: 'management/departments',
+        name: 'preview-management-departments',
+        component: () => import('@/views/management/ManagementDepartmentsView.vue'),
+        meta: {
+          preview: true,
+          previewUserType: 'MANAGEMENT',
+          title: '科室医生预览'
+        }
+      },
+      {
+        path: 'management/schedules',
+        name: 'preview-management-schedules',
+        component: () => import('@/views/management/ManagementSchedulesView.vue'),
+        meta: {
+          preview: true,
+          previewUserType: 'MANAGEMENT',
+          title: '排班号源预览'
+        }
+      },
+      {
+        path: 'management/patients',
+        name: 'preview-management-patients',
+        component: () => import('@/views/management/ManagementPatientsView.vue'),
+        meta: {
+          preview: true,
+          previewUserType: 'MANAGEMENT',
+          title: '患者挂号预览'
+        }
+      },
+      {
+        path: 'management/assets',
+        name: 'preview-management-assets',
+        component: () => import('@/views/management/ManagementAssetsView.vue'),
+        meta: {
+          preview: true,
+          previewUserType: 'MANAGEMENT',
+          title: '资产文件预览'
         }
       }
     ]

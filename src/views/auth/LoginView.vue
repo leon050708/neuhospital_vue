@@ -14,31 +14,12 @@ const loginFormRef = ref()
 const registerFormRef = ref()
 const activePanel = ref('login')
 
-const previewLinks = [
-  {
-    label: '患者端',
-    path: '/preview/patient',
-    desc: '直接看患者视图效果'
-  },
-  {
-    label: '医生端',
-    path: '/preview/doctor',
-    desc: '直接看医生工作站'
-  },
-  {
-    label: '管理端',
-    path: '/preview/management',
-    desc: '直接看管理后台样式'
-  }
-]
-
 const loginForm = reactive({
   username: '',
   password: ''
 })
 
 const registerForm = reactive({
-  username: '',
   password: '',
   confirmPassword: '',
   realName: '',
@@ -49,7 +30,7 @@ const registerForm = reactive({
 
 const loginRules = {
   username: [
-    { required: true, message: '请输入账号', trigger: 'blur' }
+    { required: true, message: '请输入登录账号或手机号', trigger: 'blur' }
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' }
@@ -57,10 +38,6 @@ const loginRules = {
 }
 
 const registerRules = {
-  username: [
-    { required: true, message: '请输入注册账号', trigger: 'blur' },
-    { min: 4, message: '账号至少 4 位', trigger: 'blur' }
-  ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
     { min: 6, message: '密码至少 6 位', trigger: 'blur' }
@@ -92,6 +69,24 @@ const registerRules = {
     { required: true, message: '请选择性别', trigger: 'change' }
   ]
 }
+
+const roleCards = [
+  {
+    label: '患者端',
+    title: '注册、挂号、支付、AI 问诊',
+    desc: '患者注册后以手机号作为登录账号，后续可进入个人档案、挂号和待支付流程。'
+  },
+  {
+    label: '医生端',
+    title: '候诊队列、病历、CT 分析',
+    desc: '医生通过已有账号登录，处理候诊患者、病历、检查申请和 CT 智能分析。'
+  },
+  {
+    label: '管理端',
+    title: '科室、医生、排班、文件管理',
+    desc: '管理员通过内部账号登录，维护医院基础资料、排班、药品与文件记录。'
+  }
+]
 
 function resolveHomeByUserType(userType) {
   if (userType === 'PATIENT') {
@@ -140,7 +135,6 @@ async function handleRegister() {
 
   try {
     await authStore.register({
-      username: registerForm.username,
       password: registerForm.password,
       realName: registerForm.realName,
       phone: registerForm.phone,
@@ -148,7 +142,7 @@ async function handleRegister() {
       gender: registerForm.gender
     })
 
-    loginForm.username = registerForm.username
+    loginForm.username = registerForm.phone
     loginForm.password = registerForm.password
 
     registerForm.confirmPassword = ''
@@ -160,7 +154,15 @@ async function handleRegister() {
     ElMessage.success('注册成功，请直接登录')
     activePanel.value = 'login'
   } catch (error) {
-    ElMessage.error(error.response?.data?.message || '注册失败，请检查填写内容')
+    const status = error.response?.status
+    const message = error.response?.data?.message
+
+    if (status === 403) {
+      ElMessage.error(message || '注册请求被后端拒绝，请检查后端是否允许匿名访问 /api/auth/register')
+      return
+    }
+
+    ElMessage.error(message || '注册失败，请检查填写内容')
   } finally {
     loading.value = false
   }
@@ -169,49 +171,25 @@ async function handleRegister() {
 
 <template>
   <div class="login-page page-shell">
-    <aside class="preview-menu glass-card">
-      <div class="preview-menu-head">
-        <div class="hud-label">Temp Portal</div>
-        <p>还没有用户时，先从这里进入三端界面。</p>
-      </div>
-
-      <button
-        v-for="item in previewLinks"
-        :key="item.path"
-        class="preview-entry"
-        @click="router.push(item.path)"
-      >
-        <strong>{{ item.label }}</strong>
-        <span>{{ item.desc }}</span>
-      </button>
-    </aside>
-
     <div class="login-grid"></div>
     <div class="login-orbit login-orbit-left"></div>
     <div class="login-orbit login-orbit-right"></div>
 
     <section class="hero-panel">
       <div class="hero-copy">
-        <div class="hud-label">Arknetic Medical Interface</div>
-        <h1>智慧云脑诊疗平台前端骨架</h1>
+        <div class="hud-label">Smart Medical Portal</div>
+        <h1>智慧云脑诊疗平台</h1>
         <p>
-          当前已接入统一登录入口、三端路由骨架、权限守卫、token 刷新预留、SSE 工具和业务布局。
-          视觉上以淡灰底、天蓝冷光和青绿色状态色为主，便于继续扩展出更完整的医院平台界面。
+          当前前端按患者端、医生端、管理端三类身份组织。患者支持注册，医生和管理员使用已有账号登录，
+          登录后会根据 `userType` 自动进入对应工作区。
         </p>
       </div>
 
-      <div class="hero-metrics">
-        <article class="metric-card glass-card">
-          <span>01 / Unified Auth</span>
-          <strong>JWT + Refresh</strong>
-        </article>
-        <article class="metric-card glass-card">
-          <span>02 / Portal Modes</span>
-          <strong>Patient / Doctor / Management</strong>
-        </article>
-        <article class="metric-card glass-card">
-          <span>03 / Stream Layer</span>
-          <strong>SSE Ready</strong>
+      <div class="hero-metrics role-grid">
+        <article v-for="item in roleCards" :key="item.label" class="metric-card glass-card role-card">
+          <span>{{ item.label }}</span>
+          <strong>{{ item.title }}</strong>
+          <p>{{ item.desc }}</p>
         </article>
       </div>
     </section>
@@ -225,8 +203,8 @@ async function handleRegister() {
         <p>
           {{
             activePanel === 'login'
-              ? '输入后端账号密码后，系统会根据 `userType` 自动进入对应业务端。'
-              : '按最新 API.md，患者可以自主注册账号，注册成功后再进入登录。'
+              ? '患者使用手机号登录，医生和管理员使用系统分配账号登录。'
+              : '当前仅开放患者注册，注册完成后手机号将直接作为登录账号。'
           }}
         </p>
       </div>
@@ -258,7 +236,7 @@ async function handleRegister() {
         <el-form-item label="账号" prop="username">
           <el-input
             v-model="loginForm.username"
-            placeholder="例如 doctor001 / admin001"
+            placeholder="患者填手机号，医生/管理员填账号"
             size="large"
           />
         </el-form-item>
@@ -290,11 +268,11 @@ async function handleRegister() {
         label-position="top"
       >
         <div class="register-grid">
-          <el-form-item label="注册账号" prop="username">
-            <el-input v-model="registerForm.username" placeholder="请输入注册账号" size="large" />
-          </el-form-item>
           <el-form-item label="真实姓名" prop="realName">
             <el-input v-model="registerForm.realName" placeholder="请输入真实姓名" size="large" />
+          </el-form-item>
+          <el-form-item label="手机号" prop="phone">
+            <el-input v-model="registerForm.phone" placeholder="注册后将作为登录账号" size="large" />
           </el-form-item>
           <el-form-item label="密码" prop="password">
             <el-input
@@ -311,9 +289,6 @@ async function handleRegister() {
               size="large"
               show-password
             />
-          </el-form-item>
-          <el-form-item label="手机号" prop="phone">
-            <el-input v-model="registerForm.phone" placeholder="请输入手机号" size="large" />
           </el-form-item>
           <el-form-item label="身份证号" prop="idCard">
             <el-input v-model="registerForm.idCard" placeholder="请输入身份证号" size="large" />
@@ -342,12 +317,10 @@ async function handleRegister() {
       </el-form>
 
       <div class="login-tips">
-        <span>已对接接口：</span>
-        <code>/api/auth/register</code>
-        <code>/api/auth/login</code>
-        <code>/api/auth/refresh</code>
-        <code>/api/auth/logout</code>
-        <code>/api/auth/me</code>
+        <span>登录说明</span>
+        <code>患者可注册</code>
+        <code>手机号即账号</code>
+        <code>医生/管理员使用内部账号</code>
       </div>
     </section>
   </div>
@@ -357,64 +330,11 @@ async function handleRegister() {
 .login-page {
   position: relative;
   display: grid;
-  grid-template-columns: 240px minmax(0, 1.05fr) minmax(360px, 440px);
+  grid-template-columns: minmax(0, 1.1fr) minmax(360px, 440px);
   gap: 28px;
   align-items: center;
   padding: 40px;
   overflow: hidden;
-}
-
-.preview-menu {
-  position: relative;
-  z-index: 1;
-  align-self: start;
-  padding: 18px;
-  border-radius: 6px;
-  background: linear-gradient(180deg, rgba(246, 250, 251, 0.86) 0%, rgba(233, 240, 243, 0.8) 100%);
-}
-
-.preview-menu-head p {
-  margin: 10px 0 16px;
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 1.75;
-}
-
-.preview-entry {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: 100%;
-  margin-bottom: 10px;
-  padding: 14px;
-  border: 1px solid rgba(121, 189, 224, 0.18);
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.42);
-  color: var(--text-primary);
-  text-align: left;
-  cursor: pointer;
-  transition: 0.2s ease;
-}
-
-.preview-entry:hover {
-  transform: translateX(3px);
-  border-color: rgba(121, 189, 224, 0.34);
-  background: rgba(252, 254, 255, 0.82);
-}
-
-.preview-entry:last-child {
-  margin-bottom: 0;
-}
-
-.preview-entry strong {
-  font-size: 15px;
-  font-weight: 800;
-}
-
-.preview-entry span {
-  color: var(--text-secondary);
-  font-size: 12px;
-  line-height: 1.7;
 }
 
 .login-grid,
@@ -483,6 +403,10 @@ async function handleRegister() {
   margin-top: 28px;
 }
 
+.role-grid {
+  align-items: stretch;
+}
+
 .metric-card {
   position: relative;
   padding: 20px;
@@ -503,6 +427,13 @@ async function handleRegister() {
   margin-top: 14px;
   font-size: 19px;
   font-weight: 800;
+}
+
+.role-card p {
+  margin: 12px 0 0;
+  color: var(--text-secondary);
+  line-height: 1.75;
+  font-size: 13px;
 }
 
 .login-panel {

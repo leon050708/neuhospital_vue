@@ -8,11 +8,16 @@ const request = axios.create({
 })
 
 let refreshingPromise = null
+const publicAuthPaths = ['/auth/login', '/auth/register', '/auth/refresh']
+
+function isPublicAuthRequest(url = '') {
+  return publicAuthPaths.some((path) => url.includes(path))
+}
 
 request.interceptors.request.use((config) => {
   const token = getAccessToken()
 
-  if (token) {
+  if (token && !isPublicAuthRequest(config.url)) {
     config.headers.Authorization = `Bearer ${token}`
   }
 

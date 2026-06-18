@@ -8,7 +8,7 @@ const router = useRouter()
   <section class="state-page glass-card">
     <div class="state-code">404</div>
     <h1>页面不存在</h1>
-    <p>这个地址还没有接入到当前项目骨架里，可以先回到工作台继续开发。</p>
+    <p>这个地址暂时还没有接入对应业务页面，可以先回到工作台继续查看当前已完成部分。</p>
     <div class="actions">
       <el-button round type="primary" @click="router.push('/workspace/home')">返回工作台</el-button>
     </div>

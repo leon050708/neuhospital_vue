@@ -43,17 +43,33 @@ const currentRole = computed(() => currentProfile.value?.role || '')
 
 const menuItems = computed(() => {
   if (previewMode.value) {
-    const baseItems = [
-      { label: '患者端预览', path: '/preview/patient' },
-      { label: '医生端预览', path: '/preview/doctor' },
-      { label: '管理端预览', path: '/preview/management' }
-    ]
-
-    if (currentUserType.value === 'DOCTOR') {
-      baseItems.splice(2, 0, { label: 'CT 分析预览', path: '/preview/doctor/ct-analysis' })
+    if (currentUserType.value === 'PATIENT') {
+      return [
+        { label: '患者首页', path: '/preview/patient' },
+        { label: '患者档案', path: '/preview/patient/profile' },
+        { label: '挂号排班', path: '/preview/patient/registration' },
+        { label: '订单支付', path: '/preview/patient/orders' },
+        { label: 'AI 问诊', path: '/preview/patient/consult' }
+      ]
     }
 
-    return baseItems
+    if (currentUserType.value === 'DOCTOR') {
+      return [
+        { label: '医生首页', path: '/preview/doctor' },
+        { label: '候诊队列', path: '/preview/doctor/queue' },
+        { label: '病历诊断', path: '/preview/doctor/records' },
+        { label: '检查处方', path: '/preview/doctor/orders' },
+        { label: 'CT 分析', path: '/preview/doctor/ct-analysis' }
+      ]
+    }
+
+    return [
+      { label: '管理首页', path: '/preview/management' },
+      { label: '科室医生', path: '/preview/management/departments' },
+      { label: '排班号源', path: '/preview/management/schedules' },
+      { label: '患者挂号', path: '/preview/management/patients' },
+      { label: '资产文件', path: '/preview/management/assets' }
+    ]
   }
 
   const baseItems = [
@@ -61,16 +77,33 @@ const menuItems = computed(() => {
   ]
 
   if (currentUserType.value === 'PATIENT') {
-    baseItems.push({ label: '患者端', path: '/workspace/patient' })
+    baseItems.push(
+      { label: '患者首页', path: '/workspace/patient' },
+      { label: '患者档案', path: '/workspace/patient/profile' },
+      { label: '挂号排班', path: '/workspace/patient/registration' },
+      { label: '订单支付', path: '/workspace/patient/orders' },
+      { label: 'AI 问诊', path: '/workspace/patient/consult' }
+    )
   }
 
   if (currentUserType.value === 'DOCTOR') {
-    baseItems.push({ label: '医生端', path: '/workspace/doctor' })
-    baseItems.push({ label: 'CT 分析', path: '/workspace/doctor/ct-analysis' })
+    baseItems.push(
+      { label: '医生首页', path: '/workspace/doctor' },
+      { label: '候诊队列', path: '/workspace/doctor/queue' },
+      { label: '病历诊断', path: '/workspace/doctor/records' },
+      { label: '检查处方', path: '/workspace/doctor/orders' },
+      { label: 'CT 分析', path: '/workspace/doctor/ct-analysis' }
+    )
   }
 
   if (currentUserType.value === 'MANAGEMENT') {
-    baseItems.push({ label: '管理端', path: '/workspace/management' })
+    baseItems.push(
+      { label: '管理首页', path: '/workspace/management' },
+      { label: '科室医生', path: '/workspace/management/departments' },
+      { label: '排班号源', path: '/workspace/management/schedules' },
+      { label: '患者挂号', path: '/workspace/management/patients' },
+      { label: '资产文件', path: '/workspace/management/assets' }
+    )
   }
 
   return baseItems
@@ -143,7 +176,7 @@ async function handleLogout() {
           <h1 class="header-title">{{ route.meta?.title || '工作台' }}</h1>
         </div>
         <div class="header-actions">
-          <div class="status-chip">{{ previewMode ? '临时预览模式' : '系统骨架已就绪' }}</div>
+          <div class="status-chip">{{ previewMode ? '临时预览模式' : '当前业务工作区' }}</div>
           <el-button round type="primary" @click="handleLogout">
             {{ previewMode ? '返回登录' : '退出登录' }}
           </el-button>
@@ -165,6 +198,8 @@ async function handleLogout() {
 
 .portal-sidebar {
   position: relative;
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
   padding: 28px 20px;
   background: var(--bg-sidebar);
