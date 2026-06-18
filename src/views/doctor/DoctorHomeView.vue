@@ -1,3 +1,15 @@
+<script setup>
+import { computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+
+const route = useRoute()
+const router = useRouter()
+
+const ctEntryPath = computed(() => {
+  return route.meta?.preview ? '/preview/doctor/ct-analysis' : '/workspace/doctor/ct-analysis'
+})
+</script>
+
 <template>
   <section class="content-grid">
     <article class="glass-card feature-hero">
@@ -25,12 +37,27 @@
         <p>当前页面仅允许 `userType = DOCTOR` 访问，后续可细分角色权限。</p>
       </article>
     </div>
+
+    <article class="glass-card ct-entry-card">
+      <div>
+        <div class="hud-label">Imaging Module</div>
+        <h3>CT 智能分析工作区</h3>
+        <p>
+          已接入医生端 CT 分析页面入口，可输入已上传的 `ctImageFileId` 发起分析任务，
+          并轮询查看模型输出、风险等级与医生确认状态。
+        </p>
+      </div>
+      <el-button type="primary" round @click="router.push(ctEntryPath)">
+        进入 CT 分析
+      </el-button>
+    </article>
   </section>
 </template>
 
 <style scoped>
 .feature-hero,
-.task-card {
+.task-card,
+.ct-entry-card {
   padding: 26px;
   border-radius: var(--radius-lg);
 }
@@ -71,13 +98,34 @@
   line-height: 1.7;
 }
 
+.ct-entry-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+
+.ct-entry-card h3 {
+  margin: 14px 0 0;
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.ct-entry-card p {
+  max-width: 760px;
+  margin: 12px 0 0;
+  color: var(--text-secondary);
+  line-height: 1.8;
+}
+
 @media (max-width: 980px) {
   .feature-hero,
   .card-grid {
     grid-template-columns: 1fr;
   }
 
-  .feature-hero {
+  .feature-hero,
+  .ct-entry-card {
     flex-direction: column;
   }
 

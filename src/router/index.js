@@ -4,7 +4,7 @@ import { useAuthStore } from '@/stores/auth'
 const routes = [
   {
     path: '/',
-    redirect: '/workspace'
+    redirect: '/login'
   },
   {
     path: '/login',
@@ -56,6 +56,16 @@ const routes = [
         }
       },
       {
+        path: 'doctor/ct-analysis',
+        name: 'doctor-ct-analysis',
+        component: () => import('@/views/doctor/DoctorCtAnalysisView.vue'),
+        meta: {
+          requiresAuth: true,
+          userTypes: ['DOCTOR'],
+          title: 'CT 分析'
+        }
+      },
+      {
         path: 'management',
         name: 'management-home',
         component: () => import('@/views/management/ManagementHomeView.vue'),
@@ -63,6 +73,60 @@ const routes = [
           requiresAuth: true,
           userTypes: ['MANAGEMENT'],
           title: '管理端'
+        }
+      }
+    ]
+  },
+  {
+    path: '/preview',
+    component: () => import('@/layout/PortalLayout.vue'),
+    meta: {
+      preview: true,
+      title: '三端预览'
+    },
+    children: [
+      {
+        path: '',
+        redirect: '/preview/patient'
+      },
+      {
+        path: 'patient',
+        name: 'preview-patient',
+        component: () => import('@/views/patient/PatientHomeView.vue'),
+        meta: {
+          preview: true,
+          previewUserType: 'PATIENT',
+          title: '患者端预览'
+        }
+      },
+      {
+        path: 'doctor',
+        name: 'preview-doctor',
+        component: () => import('@/views/doctor/DoctorHomeView.vue'),
+        meta: {
+          preview: true,
+          previewUserType: 'DOCTOR',
+          title: '医生端预览'
+        }
+      },
+      {
+        path: 'doctor/ct-analysis',
+        name: 'preview-doctor-ct-analysis',
+        component: () => import('@/views/doctor/DoctorCtAnalysisView.vue'),
+        meta: {
+          preview: true,
+          previewUserType: 'DOCTOR',
+          title: 'CT 分析预览'
+        }
+      },
+      {
+        path: 'management',
+        name: 'preview-management',
+        component: () => import('@/views/management/ManagementHomeView.vue'),
+        meta: {
+          preview: true,
+          previewUserType: 'MANAGEMENT',
+          title: '管理端预览'
         }
       }
     ]

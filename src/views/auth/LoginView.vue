@@ -14,6 +14,24 @@ const loginFormRef = ref()
 const registerFormRef = ref()
 const activePanel = ref('login')
 
+const previewLinks = [
+  {
+    label: '患者端',
+    path: '/preview/patient',
+    desc: '直接看患者视图效果'
+  },
+  {
+    label: '医生端',
+    path: '/preview/doctor',
+    desc: '直接看医生工作站'
+  },
+  {
+    label: '管理端',
+    path: '/preview/management',
+    desc: '直接看管理后台样式'
+  }
+]
+
 const loginForm = reactive({
   username: '',
   password: ''
@@ -151,6 +169,23 @@ async function handleRegister() {
 
 <template>
   <div class="login-page page-shell">
+    <aside class="preview-menu glass-card">
+      <div class="preview-menu-head">
+        <div class="hud-label">Temp Portal</div>
+        <p>还没有用户时，先从这里进入三端界面。</p>
+      </div>
+
+      <button
+        v-for="item in previewLinks"
+        :key="item.path"
+        class="preview-entry"
+        @click="router.push(item.path)"
+      >
+        <strong>{{ item.label }}</strong>
+        <span>{{ item.desc }}</span>
+      </button>
+    </aside>
+
     <div class="login-grid"></div>
     <div class="login-orbit login-orbit-left"></div>
     <div class="login-orbit login-orbit-right"></div>
@@ -322,11 +357,64 @@ async function handleRegister() {
 .login-page {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(360px, 440px);
+  grid-template-columns: 240px minmax(0, 1.05fr) minmax(360px, 440px);
   gap: 28px;
   align-items: center;
   padding: 40px;
   overflow: hidden;
+}
+
+.preview-menu {
+  position: relative;
+  z-index: 1;
+  align-self: start;
+  padding: 18px;
+  border-radius: 6px;
+  background: linear-gradient(180deg, rgba(246, 250, 251, 0.86) 0%, rgba(233, 240, 243, 0.8) 100%);
+}
+
+.preview-menu-head p {
+  margin: 10px 0 16px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+.preview-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 14px;
+  border: 1px solid rgba(121, 189, 224, 0.18);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.42);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.preview-entry:hover {
+  transform: translateX(3px);
+  border-color: rgba(121, 189, 224, 0.34);
+  background: rgba(252, 254, 255, 0.82);
+}
+
+.preview-entry:last-child {
+  margin-bottom: 0;
+}
+
+.preview-entry strong {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.preview-entry span {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.7;
 }
 
 .login-grid,

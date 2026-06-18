@@ -9,20 +9,67 @@ const authStore = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 
+const previewMode = computed(() => Boolean(route.meta?.preview))
+
+const previewProfile = computed(() => {
+  const previewUserType = route.meta?.previewUserType || 'PATIENT'
+  const profileMap = {
+    PATIENT: {
+      username: 'preview_patient',
+      userType: 'PATIENT',
+      role: 'PATIENT'
+    },
+    DOCTOR: {
+      username: 'preview_doctor',
+      userType: 'DOCTOR',
+      role: 'DOCTOR'
+    },
+    MANAGEMENT: {
+      username: 'preview_admin',
+      userType: 'MANAGEMENT',
+      role: 'ADMIN'
+    }
+  }
+
+  return profileMap[previewUserType] || profileMap.PATIENT
+})
+
+const currentProfile = computed(() => {
+  return previewMode.value ? previewProfile.value : authStore.profile
+})
+
+const currentUserType = computed(() => currentProfile.value?.userType || '')
+const currentRole = computed(() => currentProfile.value?.role || '')
+
 const menuItems = computed(() => {
+  if (previewMode.value) {
+    const baseItems = [
+      { label: '患者端预览', path: '/preview/patient' },
+      { label: '医生端预览', path: '/preview/doctor' },
+      { label: '管理端预览', path: '/preview/management' }
+    ]
+
+    if (currentUserType.value === 'DOCTOR') {
+      baseItems.splice(2, 0, { label: 'CT 分析预览', path: '/preview/doctor/ct-analysis' })
+    }
+
+    return baseItems
+  }
+
   const baseItems = [
     { label: '工作台', path: '/workspace/home' }
   ]
 
-  if (authStore.userType === 'PATIENT') {
+  if (currentUserType.value === 'PATIENT') {
     baseItems.push({ label: '患者端', path: '/workspace/patient' })
   }
 
-  if (authStore.userType === 'DOCTOR') {
+  if (currentUserType.value === 'DOCTOR') {
     baseItems.push({ label: '医生端', path: '/workspace/doctor' })
+    baseItems.push({ label: 'CT 分析', path: '/workspace/doctor/ct-analysis' })
   }
 
-  if (authStore.userType === 'MANAGEMENT') {
+  if (currentUserType.value === 'MANAGEMENT') {
     baseItems.push({ label: '管理端', path: '/workspace/management' })
   }
 
@@ -38,10 +85,19 @@ const welcomeText = computed(() => {
     MANAGEMENT: '管理控制台'
   }
 
-  return map[authStore.userType] || '智慧云脑诊疗平台'
+  if (previewMode.value) {
+    return `${map[currentUserType.value] || '三端工作区'} · 临时预览`
+  }
+
+  return map[currentUserType.value] || '智慧云脑诊疗平台'
 })
 
 async function handleLogout() {
+  if (previewMode.value) {
+    router.push('/login')
+    return
+  }
+
   await authStore.logout()
   ElMessage.success('已退出登录')
   router.push('/login')
@@ -75,8 +131,8 @@ async function handleLogout() {
 
       <div class="sidebar-footer">
         <div class="sidebar-caption">Access Identity</div>
-        <div class="sidebar-user">{{ authStore.profile?.username || '未登录' }}</div>
-        <div class="sidebar-role">{{ authStore.userType }} / {{ authStore.role || 'NO_ROLE' }}</div>
+        <div class="sidebar-user">{{ currentProfile?.username || '未登录' }}</div>
+        <div class="sidebar-role">{{ currentUserType || 'GUEST' }} / {{ currentRole || 'NO_ROLE' }}</div>
       </div>
     </aside>
 
@@ -87,8 +143,10 @@ async function handleLogout() {
           <h1 class="header-title">{{ route.meta?.title || '工作台' }}</h1>
         </div>
         <div class="header-actions">
-          <div class="status-chip">系统骨架已就绪</div>
-          <el-button round type="primary" @click="handleLogout">退出登录</el-button>
+          <div class="status-chip">{{ previewMode ? '临时预览模式' : '系统骨架已就绪' }}</div>
+          <el-button round type="primary" @click="handleLogout">
+            {{ previewMode ? '返回登录' : '退出登录' }}
+          </el-button>
         </div>
       </header>
 
