@@ -18,6 +18,11 @@ const submitting = ref(false)
 const dialogVisible = ref(false)
 const dialogMode = ref('create')
 const editingScheduleId = ref(null)
+const selectedSchedules = ref([])
+const batchDialogVisible = ref(false)
+const batchSubmitting = ref(false)
+const batchCreateDialogVisible = ref(false)
+const batchCreateSubmitting = ref(false)
 
 const timeSlotOptions = [
   { label: '上午', value: 'AM' },
@@ -57,6 +62,23 @@ const form = reactive({
   status: 'ENABLED'
 })
 
+const batchForm = reactive({
+  sourceCount: null,
+  feeAmount: null,
+  sourceType: '',
+  status: ''
+})
+
+const batchCreateForm = reactive({
+  departmentId: '',
+  doctorId: '',
+  dateRange: [],
+  timeSlots: ['AM'],
+  sourceCount: 20,
+  feeAmount: 0,
+  sourceType: 'NORMAL'
+})
+
 const rules = {
   departmentId: [{ required: true, message: '请选择科室', trigger: 'change' }],
   doctorId: [{ required: true, message: '请选择医生', trigger: 'change' }],
@@ -68,6 +90,7 @@ const rules = {
 }
 
 const scheduleFormRef = ref()
+const scheduleTableRef = ref()
 
 function unwrapResult(response, fallbackMessage) {
   if (response?.code === 200) {
@@ -120,6 +143,23 @@ function resetForm() {
   editingScheduleId.value = null
 }
 
+function resetBatchForm() {
+  batchForm.sourceCount = null
+  batchForm.feeAmount = null
+  batchForm.sourceType = ''
+  batchForm.status = ''
+}
+
+function resetBatchCreateForm() {
+  batchCreateForm.departmentId = ''
+  batchCreateForm.doctorId = ''
+  batchCreateForm.dateRange = []
+  batchCreateForm.timeSlots = ['AM']
+  batchCreateForm.sourceCount = 20
+  batchCreateForm.feeAmount = 0
+  batchCreateForm.sourceType = 'NORMAL'
+}
+
 function handlePageChange(page) {
   query.pageNo = page
   loadSchedules()
@@ -129,6 +169,10 @@ function handlePageSizeChange(size) {
   query.pageSize = size
   query.pageNo = 1
   loadSchedules()
+}
+
+function handleSelectionChange(rows) {
+  selectedSchedules.value = rows
 }
 
 async function loadDepartments() {
@@ -182,6 +226,9 @@ async function loadSchedules() {
     const pageData = unwrapResult(response, '加载排班失败') || {}
     schedules.value = pageData.records || []
     total.value = pageData.total || 0
+    selectedSchedules.value = selectedSchedules.value.filter((selectedRow) =>
+      schedules.value.some((row) => row.id === selectedRow.id)
+    )
   } catch (error) {
     ElMessage.error(error.message || error.response?.data?.message || '加载排班失败')
   } finally {
@@ -201,6 +248,11 @@ async function handleFormDepartmentChange() {
   await loadDoctors(form.departmentId)
 }
 
+async function handleBatchCreateDepartmentChange() {
+  batchCreateForm.doctorId = ''
+  await loadDoctors(batchCreateForm.departmentId)
+}
+
 function openCreateDialog() {
   dialogMode.value = 'create'
   resetForm()
@@ -208,6 +260,21 @@ function openCreateDialog() {
   nextTick(() => {
     scheduleFormRef.value?.clearValidate()
   })
+}
+
+function openBatchCreateDialog() {
+  resetBatchCreateForm()
+  batchCreateDialogVisible.value = true
+}
+
+function openBatchDialog() {
+  if (!selectedSchedules.value.length) {
+    ElMessage.warning('请先勾选要批量修改的排班')
+    return
+  }
+
+  resetBatchForm()
+  batchDialogVisible.value = true
 }
 
 async function openEditDialog(row) {
@@ -273,6 +340,138 @@ async function submitForm() {
   }
 }
 
+async function submitBatchForm() {
+  if (!selectedSchedules.value.length) {
+    ElMessage.warning('请先勾选要批量修改的排班')
+    return
+  }
+
+  const payload = {}
+
+  if (batchForm.sourceCount !== null) {
+    payload.sourceCount = Number(batchForm.sourceCount)
+  }
+  if (batchForm.feeAmount !== null) {
+    payload.feeAmount = Number(batchForm.feeAmount)
+  }
+  if (batchForm.sourceType) {
+    payload.sourceType = batchForm.sourceType
+  }
+  if (batchForm.status) {
+    payload.status = batchForm.status
+  }
+
+  if (!Object.keys(payload).length) {
+    ElMessage.warning('请至少填写一个批量修改项')
+    return
+  }
+
+  batchSubmitting.value = true
+
+  try {
+    const results = await Promise.allSettled(
+      selectedSchedules.value.map((row) => updateSchedule(row.id, payload))
+    )
+    const successCount = results.filter((item) => item.status === 'fulfilled').length
+    const failedCount = results.length - successCount
+
+    if (successCount) {
+      ElMessage.success(
+        failedCount
+          ? `批量修改完成，成功 ${successCount} 条，失败 ${failedCount} 条`
+          : `批量修改成功，共更新 ${successCount} 条排班`
+      )
+    } else {
+      throw new Error('批量修改失败')
+    }
+
+    batchDialogVisible.value = false
+    selectedSchedules.value = []
+    await loadSchedules()
+    scheduleTableRef.value?.clearSelection()
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || error.message || '批量修改失败')
+  } finally {
+    batchSubmitting.value = false
+  }
+}
+
+function buildDateList(startDateText, endDateText) {
+  const result = []
+  const cursor = new Date(`${startDateText}T00:00:00`)
+  const end = new Date(`${endDateText}T00:00:00`)
+
+  while (cursor <= end) {
+    const year = cursor.getFullYear()
+    const month = String(cursor.getMonth() + 1).padStart(2, '0')
+    const day = String(cursor.getDate()).padStart(2, '0')
+    result.push(`${year}-${month}-${day}`)
+    cursor.setDate(cursor.getDate() + 1)
+  }
+
+  return result
+}
+
+async function submitBatchCreateForm() {
+  if (!batchCreateForm.departmentId) {
+    ElMessage.warning('请选择科室')
+    return
+  }
+  if (!batchCreateForm.doctorId) {
+    ElMessage.warning('请选择医生')
+    return
+  }
+  if (!batchCreateForm.dateRange?.length || !batchCreateForm.dateRange[0] || !batchCreateForm.dateRange[1]) {
+    ElMessage.warning('请选择排班日期范围')
+    return
+  }
+  if (!batchCreateForm.timeSlots.length) {
+    ElMessage.warning('请至少选择一个出诊时段')
+    return
+  }
+
+  const [startDate, endDate] = batchCreateForm.dateRange
+  const dateList = buildDateList(startDate, endDate)
+  const payloadList = dateList.flatMap((scheduleDate) => {
+    return batchCreateForm.timeSlots.map((timeSlot) => ({
+      doctorId: Number(batchCreateForm.doctorId),
+      departmentId: Number(batchCreateForm.departmentId),
+      scheduleDate,
+      timeSlot,
+      sourceCount: Number(batchCreateForm.sourceCount),
+      feeAmount: Number(batchCreateForm.feeAmount),
+      sourceType: batchCreateForm.sourceType
+    }))
+  })
+
+  batchCreateSubmitting.value = true
+
+  try {
+    const results = await Promise.allSettled(
+      payloadList.map((payload) => createSchedule(payload))
+    )
+    const successCount = results.filter((item) => item.status === 'fulfilled').length
+    const failedCount = results.length - successCount
+
+    if (successCount) {
+      ElMessage.success(
+        failedCount
+          ? `批量新增完成，成功 ${successCount} 条，失败 ${failedCount} 条`
+          : `批量新增成功，共创建 ${successCount} 条排班`
+      )
+    } else {
+      throw new Error('批量新增失败')
+    }
+
+    batchCreateDialogVisible.value = false
+    await loadSchedules()
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || error.message || '批量新增失败')
+  } finally {
+    batchCreateSubmitting.value = false
+  }
+}
+
 async function handleCloseSchedule(row) {
   try {
     await ElMessageBox.confirm(
@@ -309,9 +508,15 @@ onMounted(async () => {
         <div>
           <div class="status-chip">Schedules</div>
           <h2 class="section-title">排班号源管理</h2>
-          <p class="section-desc">支持按科室、医生、日期筛选，并直接新增、修改、关闭排班。</p>
+          <p class="section-desc">支持按科室、医生、日期筛选，并直接新增、修改、批量调整、关闭排班。</p>
         </div>
-        <el-button v-if="!isPreview" type="primary" round @click="openCreateDialog">新增排班</el-button>
+        <div v-if="!isPreview" class="header-actions">
+          <el-button round :disabled="!selectedSchedules.length" @click="openBatchDialog">
+            批量修改
+          </el-button>
+          <el-button round @click="openBatchCreateDialog">批量新增</el-button>
+          <el-button type="primary" round @click="openCreateDialog">新增排班</el-button>
+        </div>
       </div>
 
       <el-alert
@@ -363,11 +568,15 @@ onMounted(async () => {
         </div>
 
         <el-table
+          ref="scheduleTableRef"
           :data="schedules"
+          row-key="id"
           v-loading="loading"
           class="table-block"
           empty-text="没有查询到排班数据"
+          @selection-change="handleSelectionChange"
         >
+          <el-table-column type="selection" width="48" reserve-selection />
           <el-table-column prop="id" label="排班 ID" min-width="96" />
           <el-table-column prop="departmentName" label="科室" min-width="140" />
           <el-table-column prop="doctorName" label="医生" min-width="120" />
@@ -412,7 +621,7 @@ onMounted(async () => {
         </el-table>
 
         <div class="list-footer">
-          <span>当前共 {{ total }} 条排班记录</span>
+          <span>当前共 {{ total }} 条排班记录，已选 {{ selectedSchedules.length }} 条</span>
           <el-pagination
             background
             layout="total, sizes, prev, pager, next"
@@ -517,6 +726,146 @@ onMounted(async () => {
         </el-button>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="batchDialogVisible"
+      title="批量修改排班"
+      width="560px"
+      destroy-on-close
+    >
+      <el-alert
+        title="留空的字段不会被修改，只会更新你填写的内容。"
+        type="info"
+        :closable="false"
+        show-icon
+      />
+
+      <el-form :model="batchForm" label-width="96px" class="batch-form">
+        <el-form-item label="总号源">
+          <el-input-number v-model="batchForm.sourceCount" :min="1" :max="500" placeholder="留空则不修改" />
+        </el-form-item>
+
+        <el-form-item label="挂号费用">
+          <el-input-number v-model="batchForm.feeAmount" :min="0" :precision="2" :step="1" placeholder="留空则不修改" />
+        </el-form-item>
+
+        <el-form-item label="号源类型">
+          <el-select v-model="batchForm.sourceType" clearable placeholder="留空则不修改">
+            <el-option
+              v-for="item in sourceTypeOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="排班状态">
+          <el-select v-model="batchForm.status" clearable placeholder="留空则不修改">
+            <el-option
+              v-for="item in statusOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button round @click="batchDialogVisible = false">取消</el-button>
+        <el-button type="primary" round :loading="batchSubmitting" @click="submitBatchForm">
+          确认批量修改
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="batchCreateDialogVisible"
+      title="批量新增排班"
+      width="640px"
+      destroy-on-close
+    >
+      <el-alert
+        title="会按所选日期范围和时段组合批量创建排班。"
+        type="info"
+        :closable="false"
+        show-icon
+      />
+
+      <el-form :model="batchCreateForm" label-width="96px" class="batch-form">
+        <el-form-item label="所属科室">
+          <el-select v-model="batchCreateForm.departmentId" placeholder="选择科室" @change="handleBatchCreateDepartmentChange">
+            <el-option
+              v-for="item in departments"
+              :key="item.id"
+              :label="item.deptName"
+              :value="item.id"
+            />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="出诊医生">
+          <el-select v-model="batchCreateForm.doctorId" placeholder="选择医生" :disabled="!batchCreateForm.departmentId">
+            <el-option
+              v-for="item in doctors"
+              :key="item.id"
+              :label="`${item.name}${item.title ? ` / ${item.title}` : ''}`"
+              :value="item.id"
+            />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="日期范围">
+          <el-date-picker
+            v-model="batchCreateForm.dateRange"
+            type="daterange"
+            value-format="YYYY-MM-DD"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            range-separator="至"
+          />
+        </el-form-item>
+
+        <el-form-item label="出诊时段">
+          <el-checkbox-group v-model="batchCreateForm.timeSlots">
+            <el-checkbox
+              v-for="item in timeSlotOptions"
+              :key="item.value"
+              :label="item.value"
+            >
+              {{ item.label }}
+            </el-checkbox>
+          </el-checkbox-group>
+        </el-form-item>
+
+        <el-form-item label="总号源">
+          <el-input-number v-model="batchCreateForm.sourceCount" :min="1" :max="500" />
+        </el-form-item>
+
+        <el-form-item label="挂号费用">
+          <el-input-number v-model="batchCreateForm.feeAmount" :min="0" :precision="2" :step="1" />
+        </el-form-item>
+
+        <el-form-item label="号源类型">
+          <el-select v-model="batchCreateForm.sourceType" placeholder="选择号源类型">
+            <el-option
+              v-for="item in sourceTypeOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button round @click="batchCreateDialogVisible = false">取消</el-button>
+        <el-button type="primary" round :loading="batchCreateSubmitting" @click="submitBatchCreateForm">
+          确认批量新增
+        </el-button>
+      </template>
+    </el-dialog>
   </section>
 </template>
 
@@ -531,6 +880,12 @@ onMounted(async () => {
   justify-content: space-between;
   gap: 16px;
   align-items: flex-start;
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
 }
 
 .filter-grid {
@@ -560,10 +915,19 @@ onMounted(async () => {
   align-items: center;
 }
 
+.batch-form {
+  margin-top: 18px;
+}
+
 @media (max-width: 980px) {
   .page-header {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .header-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
 
   .filter-grid {

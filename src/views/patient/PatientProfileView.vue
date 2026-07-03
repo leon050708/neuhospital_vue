@@ -5,6 +5,7 @@ import { useRoute } from 'vue-router'
 
 import { getPatientDetail } from '@/api/patients'
 import { useAuthStore } from '@/stores/auth'
+import { unwrapResult } from '@/utils/result'
 
 const route = useRoute()
 const authStore = useAuthStore()
@@ -13,10 +14,23 @@ const loading = ref(false)
 const patient = ref(null)
 
 const isPreview = computed(() => Boolean(route.meta?.preview))
-const patientId = computed(() => authStore.profile?.bizId)
+const patientId = computed(() => authStore.profile?.bizId || authStore.profile?.patientId || authStore.profile?.id)
 
 async function loadPatientDetail() {
-  if (isPreview.value || !patientId.value) {
+  if (isPreview.value) {
+    return
+  }
+
+  if (!patientId.value && authStore.isAuthenticated) {
+    try {
+      await authStore.ensureProfile()
+    } catch (error) {
+      ElMessage.error(error.message || '加载当前登录信息失败')
+      return
+    }
+  }
+
+  if (!patientId.value) {
     return
   }
 
@@ -24,9 +38,9 @@ async function loadPatientDetail() {
 
   try {
     const response = await getPatientDetail(patientId.value)
-    patient.value = response.data || null
+    patient.value = unwrapResult(response, '加载患者档案失败') || null
   } catch (error) {
-    ElMessage.error(error.response?.data?.message || '加载患者档案失败')
+    ElMessage.error(error.message || error.response?.data?.message || '加载患者档案失败')
   } finally {
     loading.value = false
   }
@@ -53,7 +67,7 @@ onMounted(loadPatientDetail)
 
       <el-alert
         v-else-if="!patientId"
-        title="当前登录信息里没有 patient bizId，暂时无法查询患者档案"
+        title="当前登录信息里没有可用的患者标识，暂时无法查询患者档案"
         type="warning"
         :closable="false"
         show-icon
