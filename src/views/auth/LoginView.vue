@@ -73,35 +73,35 @@ const registerRules = {
 const roleCards = [
   {
     label: '患者端',
-    title: '注册、挂号、支付、AI 问诊',
-    desc: '患者注册后以手机号作为登录账号，后续可进入个人档案、挂号和待支付流程。'
+    title: '档案、病例、挂号、支付、AI 问诊',
+    desc: '当前已接患者档案、病例查看、排班挂号、我的挂号、待支付项目和 AI 问诊会话。'
   },
   {
     label: '医生端',
-    title: '候诊队列、病历、CT 分析',
-    desc: '医生通过已有账号登录，处理候诊患者、病历、检查申请和 CT 智能分析。'
+    title: '候诊、病历、检查、CT 分析',
+    desc: '当前已接候诊队列、病历查询、检查/检验申请、处方发药和 CT 智能分析。'
   },
   {
     label: '管理端',
-    title: '科室、医生、排班、文件管理',
-    desc: '管理员通过内部账号登录，维护医院基础资料、排班、药品与文件记录。'
+    title: '科室、排班、患者、资产查询',
+    desc: '当前已接科室、医生、排班、患者、药品库存和文件记录查询。'
   }
 ]
 
 function resolveHomeByUserType(userType) {
   if (userType === 'PATIENT') {
-    return '/workspace/patient'
+    return '/workspace/patient/profile'
   }
 
   if (userType === 'DOCTOR') {
-    return '/workspace/doctor'
+    return '/workspace/doctor/queue'
   }
 
-  if (userType === 'MANAGEMENT') {
-    return '/workspace/management'
+  if (userType === 'MANAGEMENT' || userType === 'ADMIN') {
+    return '/workspace/management/departments'
   }
 
-  return '/workspace/home'
+  return '/login'
 }
 
 async function handleLogin() {
@@ -180,8 +180,8 @@ async function handleRegister() {
         <div class="hud-label">Smart Medical Portal</div>
         <h1>智慧云脑诊疗平台</h1>
         <p>
-          当前前端按患者端、医生端、管理端三类身份组织。患者支持注册，医生和管理员使用已有账号登录，
-          登录后会根据 `userType` 自动进入对应工作区。
+          当前前端按患者端、医生端、管理端三类身份组织，并已经对齐现有后端接口。
+          患者支持注册，医生和管理员使用已有账号登录，登录后会根据 `userType` 自动进入对应工作区。
         </p>
       </div>
 

@@ -1,6 +1,32 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
+function resolveWorkspaceDefaultPath(userType) {
+  if (userType === 'PATIENT') {
+    return '/workspace/patient/profile'
+  }
+
+  if (userType === 'DOCTOR') {
+    return '/workspace/doctor/queue'
+  }
+
+  if (userType === 'MANAGEMENT' || userType === 'ADMIN') {
+    return '/workspace/management/departments'
+  }
+
+  return '/login'
+}
+
+function getStoredUserType() {
+  const authStore = useAuthStore()
+
+  if (!authStore.initialized) {
+    authStore.hydrate()
+  }
+
+  return authStore.userType
+}
+
 const routes = [
   {
     path: '/',
@@ -24,26 +50,7 @@ const routes = [
     children: [
       {
         path: '',
-        redirect: '/workspace/home'
-      },
-      {
-        path: 'home',
-        name: 'workspace-home',
-        component: () => import('@/views/common/WorkspaceHomeView.vue'),
-        meta: {
-          requiresAuth: true,
-          title: '工作台'
-        }
-      },
-      {
-        path: 'patient',
-        name: 'patient-home',
-        component: () => import('@/views/patient/PatientHomeView.vue'),
-        meta: {
-          requiresAuth: true,
-          userTypes: ['PATIENT'],
-          title: '患者端'
-        }
+        redirect: () => resolveWorkspaceDefaultPath(getStoredUserType())
       },
       {
         path: 'patient/profile',
@@ -53,6 +60,16 @@ const routes = [
           requiresAuth: true,
           userTypes: ['PATIENT'],
           title: '患者档案'
+        }
+      },
+      {
+        path: 'patient/records',
+        name: 'patient-records',
+        component: () => import('@/views/patient/PatientRecordsView.vue'),
+        meta: {
+          requiresAuth: true,
+          userTypes: ['PATIENT'],
+          title: '我的病例'
         }
       },
       {
@@ -83,16 +100,6 @@ const routes = [
           requiresAuth: true,
           userTypes: ['PATIENT'],
           title: 'AI 问诊'
-        }
-      },
-      {
-        path: 'doctor',
-        name: 'doctor-home',
-        component: () => import('@/views/doctor/DoctorHomeView.vue'),
-        meta: {
-          requiresAuth: true,
-          userTypes: ['DOCTOR'],
-          title: '医生端'
         }
       },
       {
@@ -133,16 +140,6 @@ const routes = [
           requiresAuth: true,
           userTypes: ['DOCTOR'],
           title: 'CT 分析'
-        }
-      },
-      {
-        path: 'management',
-        name: 'management-home',
-        component: () => import('@/views/management/ManagementHomeView.vue'),
-        meta: {
-          requiresAuth: true,
-          userTypes: ['MANAGEMENT'],
-          title: '管理端'
         }
       },
       {
@@ -197,17 +194,7 @@ const routes = [
     children: [
       {
         path: '',
-        redirect: '/preview/patient'
-      },
-      {
-        path: 'patient',
-        name: 'preview-patient',
-        component: () => import('@/views/patient/PatientHomeView.vue'),
-        meta: {
-          preview: true,
-          previewUserType: 'PATIENT',
-          title: '患者端预览'
-        }
+        redirect: '/preview/patient/profile'
       },
       {
         path: 'patient/profile',
@@ -217,6 +204,16 @@ const routes = [
           preview: true,
           previewUserType: 'PATIENT',
           title: '患者档案预览'
+        }
+      },
+      {
+        path: 'patient/records',
+        name: 'preview-patient-records',
+        component: () => import('@/views/patient/PatientRecordsView.vue'),
+        meta: {
+          preview: true,
+          previewUserType: 'PATIENT',
+          title: '我的病例预览'
         }
       },
       {
@@ -247,16 +244,6 @@ const routes = [
           preview: true,
           previewUserType: 'PATIENT',
           title: 'AI 问诊预览'
-        }
-      },
-      {
-        path: 'doctor',
-        name: 'preview-doctor',
-        component: () => import('@/views/doctor/DoctorHomeView.vue'),
-        meta: {
-          preview: true,
-          previewUserType: 'DOCTOR',
-          title: '医生端预览'
         }
       },
       {
@@ -297,16 +284,6 @@ const routes = [
           preview: true,
           previewUserType: 'DOCTOR',
           title: 'CT 分析预览'
-        }
-      },
-      {
-        path: 'management',
-        name: 'preview-management',
-        component: () => import('@/views/management/ManagementHomeView.vue'),
-        meta: {
-          preview: true,
-          previewUserType: 'MANAGEMENT',
-          title: '管理端预览'
         }
       },
       {
@@ -375,19 +352,7 @@ const router = createRouter({
 })
 
 function resolveHomeByUserType(userType) {
-  if (userType === 'PATIENT') {
-    return '/workspace/patient'
-  }
-
-  if (userType === 'DOCTOR') {
-    return '/workspace/doctor'
-  }
-
-  if (userType === 'MANAGEMENT') {
-    return '/workspace/management'
-  }
-
-  return '/workspace/home'
+  return resolveWorkspaceDefaultPath(userType)
 }
 
 router.beforeEach(async (to) => {

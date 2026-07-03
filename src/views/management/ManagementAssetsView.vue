@@ -5,6 +5,7 @@ import { useRoute } from 'vue-router'
 
 import { getDrugPage } from '@/api/drugs'
 import { getFileList } from '@/api/files'
+import { unwrapResult } from '@/utils/result'
 
 const route = useRoute()
 const isPreview = computed(() => Boolean(route.meta?.preview))
@@ -29,6 +30,16 @@ const fileQuery = reactive({
   keyword: ''
 })
 
+function normalizeFileRecord(record) {
+  return {
+    id: record.id,
+    originalName: record.originalName || record.fileName || '--',
+    bizType: record.bizType || '--',
+    contentType: record.contentType || '--',
+    uploadedAt: record.uploadedAt || record.createdAt || '--'
+  }
+}
+
 async function loadDrugs() {
   if (isPreview.value) {
     return
@@ -44,7 +55,7 @@ async function loadDrugs() {
       category: drugQuery.category || undefined
     })
 
-    const pageData = response.data || {}
+    const pageData = unwrapResult(response, '加载药品数据失败') || {}
     drugs.value = pageData.records || []
     drugTotal.value = pageData.total || 0
   } catch (error) {
@@ -69,8 +80,8 @@ async function loadFiles() {
       keyword: fileQuery.keyword || undefined
     })
 
-    const pageData = response.data || {}
-    files.value = pageData.records || []
+    const pageData = unwrapResult(response, '加载文件记录失败') || {}
+    files.value = (pageData.records || []).map(normalizeFileRecord)
     fileTotal.value = pageData.total || 0
   } catch (error) {
     ElMessage.error(error.response?.data?.message || '加载文件记录失败')

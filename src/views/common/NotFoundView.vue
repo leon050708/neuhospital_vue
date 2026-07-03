@@ -1,16 +1,36 @@
 <script setup>
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 
+import { useAuthStore } from '@/stores/auth'
+
 const router = useRouter()
+const authStore = useAuthStore()
+
+const fallbackPath = computed(() => {
+  if (authStore.userType === 'PATIENT') {
+    return '/workspace/patient/profile'
+  }
+
+  if (authStore.userType === 'DOCTOR') {
+    return '/workspace/doctor/queue'
+  }
+
+  if (authStore.userType === 'MANAGEMENT' || authStore.userType === 'ADMIN') {
+    return '/workspace/management/departments'
+  }
+
+  return '/login'
+})
 </script>
 
 <template>
   <section class="state-page glass-card">
     <div class="state-code">404</div>
     <h1>页面不存在</h1>
-    <p>这个地址暂时还没有接入对应业务页面，可以先回到工作台继续查看当前已完成部分。</p>
+    <p>这个地址暂时没有对应页面，可以先回到当前身份的业务入口继续使用。</p>
     <div class="actions">
-      <el-button round type="primary" @click="router.push('/workspace/home')">返回工作台</el-button>
+      <el-button round type="primary" @click="router.push(fallbackPath)">返回业务页</el-button>
     </div>
   </section>
 </template>

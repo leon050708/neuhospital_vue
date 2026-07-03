@@ -9,6 +9,7 @@ import {
   getUserProfile,
   setAuthStorage
 } from '@/utils/auth'
+import { unwrapResult } from '@/utils/result'
 
 export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref('')
@@ -20,6 +21,7 @@ export const useAuthStore = defineStore('auth', () => {
   const isAuthenticated = computed(() => Boolean(accessToken.value))
   const userType = computed(() => profile.value?.userType || '')
   const role = computed(() => profile.value?.role || '')
+  const shouldAttemptRemoteLogout = !import.meta.env.DEV || import.meta.env.VITE_ENABLE_REMOTE_LOGOUT === 'true'
 
   function hydrate() {
     accessToken.value = getAccessToken()
@@ -30,13 +32,16 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function applyAuthPayload(payload) {
-    accessToken.value = payload.accessToken || ''
+    const resolvedUserType = payload.userType || payload.role || ''
+    const resolvedRole = payload.role || payload.userType || ''
+
+    accessToken.value = payload.accessToken || accessToken.value || ''
     refreshToken.value = payload.refreshToken || refreshToken.value || ''
     profile.value = {
       userId: payload.userId,
       username: payload.username,
-      role: payload.role,
-      userType: payload.userType,
+      role: resolvedRole,
+      userType: resolvedUserType,
       bizId: payload.bizId,
       sessionId: payload.sessionId,
       refreshTokenId: payload.refreshTokenId
@@ -52,8 +57,9 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function login(credentials) {
     const response = await loginApi(credentials)
-    applyAuthPayload(response)
-    return response
+    const payload = unwrapResult(response, '登录失败')
+    applyAuthPayload(payload)
+    return profile.value
   }
 
   async function register(payload) {
@@ -70,7 +76,12 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     const response = await getCurrentUser()
-    profile.value = response
+    const payload = unwrapResult(response, '加载当前用户失败')
+    profile.value = {
+      ...payload,
+      userType: payload.userType || payload.role || '',
+      role: payload.role || payload.userType || ''
+    }
     profileLoaded.value = true
 
     setAuthStorage({
@@ -84,7 +95,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function logout() {
     try {
-      if (accessToken.value) {
+      if (accessToken.value && shouldAttemptRemoteLogout) {
         await logoutApi()
       }
     } finally {

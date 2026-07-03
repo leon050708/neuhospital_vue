@@ -8,10 +8,40 @@ const request = axios.create({
 })
 
 let refreshingPromise = null
+let redirectingToLogin = false
 const publicAuthPaths = ['/auth/login', '/auth/register', '/auth/refresh']
 
 function isPublicAuthRequest(url = '') {
   return publicAuthPaths.some((path) => url.includes(path))
+}
+
+function buildLoginRedirectPath() {
+  const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`
+  return `/login?redirect=${encodeURIComponent(currentPath)}`
+}
+
+function forceRelogin() {
+  clearAuthStorage()
+
+  if (redirectingToLogin) {
+    return
+  }
+
+  redirectingToLogin = true
+  window.location.replace(buildLoginRedirectPath())
+}
+
+function shouldForceRelogin(status, requestUrl) {
+  if (isPublicAuthRequest(requestUrl)) {
+    return false
+  }
+
+  if (status === 401) {
+    return true
+  }
+
+  // Back-end restarts or in-memory session loss may surface as 403.
+  return status === 403 && Boolean(getAccessToken())
 }
 
 request.interceptors.request.use((config) => {
@@ -55,8 +85,8 @@ request.interceptors.response.use(
       && getRefreshToken()
 
     if (!canRefresh) {
-      if (status === 401) {
-        clearAuthStorage()
+      if (shouldForceRelogin(status, requestUrl)) {
+        forceRelogin()
       }
       return Promise.reject(error)
     }
@@ -75,7 +105,7 @@ request.interceptors.response.use(
       originalRequest.headers.Authorization = `Bearer ${nextAccessToken}`
       return request(originalRequest)
     } catch (refreshError) {
-      clearAuthStorage()
+      forceRelogin()
       return Promise.reject(refreshError)
     }
   }
