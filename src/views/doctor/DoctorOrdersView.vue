@@ -568,8 +568,18 @@ function removeInspectionResultItem(index) {
   inspectionResultForm.items.splice(index, 1)
 }
 
+function resolveOrderSection() {
+  const section = route.meta?.orderSection
+  if (section === 'inspection' || section === 'prescription') {
+    return section
+  }
+
+  return 'check'
+}
+
 onMounted(async () => {
   applyRecordContextFromQuery()
+  activeTab.value = resolveOrderSection()
   await Promise.all([loadDrugs(), loadCheckRequests(), loadInspectionRequests(), loadPrescriptions()])
 })
 
@@ -577,6 +587,13 @@ watch(
   () => route.query,
   () => {
     applyRecordContextFromQuery()
+  }
+)
+
+watch(
+  () => route.meta?.orderSection,
+  () => {
+    activeTab.value = resolveOrderSection()
   }
 )
 </script>
@@ -980,6 +997,10 @@ watch(
   border-radius: 6px;
   background: rgba(247, 251, 252, 0.72);
   border: 1px solid rgba(255, 255, 255, 0.46);
+}
+
+.tabs-block :deep(.el-tabs__header) {
+  display: none;
 }
 
 .sub-card h3 {

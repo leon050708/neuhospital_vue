@@ -34,18 +34,33 @@ const query = reactive({
   scheduleDate: ''
 })
 
+function formatDateKey(date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function buildNextSevenDates() {
+  const result = []
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  for (let index = 0; index < 7; index += 1) {
+    const nextDate = new Date(today)
+    nextDate.setDate(today.getDate() + index)
+    result.push(formatDateKey(nextDate))
+  }
+
+  return result
+}
+
 const doctorMap = computed(() => {
   return new Map(doctors.value.map((item) => [String(item.id), item]))
 })
 
 const dateOptions = computed(() => {
-  const dates = Array.from(new Set(
-    schedules.value
-      .map((item) => item.scheduleDate)
-      .filter(Boolean)
-  ))
-
-  return dates.sort((a, b) => String(a).localeCompare(String(b)))
+  return buildNextSevenDates()
 })
 
 const registeredScheduleIds = computed(() => {
@@ -132,8 +147,8 @@ function formatDateLabel(dateText) {
 }
 
 function formatTimeSlot(slot) {
-  if (slot === 'AM') return '上午'
-  if (slot === 'PM') return '下午'
+  if (slot === 'AM' || slot === 'MORNING') return '上午'
+  if (slot === 'PM' || slot === 'AFTERNOON') return '下午'
   if (slot === 'NIGHT') return '夜间'
   return slot || '--'
 }
@@ -327,19 +342,16 @@ async function loadSchedules() {
     const response = await getSchedulePage({
       pageNo: 1,
       pageSize: 100,
-      departmentId: Number(query.departmentId)
+      departmentId: Number(query.departmentId),
+      bookableOnly: true
     })
 
     const pageData = unwrapResult(response, '加载排班失败') || {}
     schedules.value = (pageData.records || []).map(normalizeSchedule)
     reconcileOptimisticAvailableCaps(schedules.value)
 
-    if (dateOptions.value.length) {
-      if (!query.scheduleDate || !dateOptions.value.includes(query.scheduleDate)) {
-        query.scheduleDate = dateOptions.value[0]
-      }
-    } else {
-      query.scheduleDate = ''
+    if (!query.scheduleDate || !dateOptions.value.includes(query.scheduleDate)) {
+      query.scheduleDate = dateOptions.value[0] || ''
     }
   } catch (error) {
     ElMessage.error(error.message || error.response?.data?.message || '加载排班失败')
@@ -405,7 +417,7 @@ onMounted(async () => {
     <article class="glass-card panel-card">
       <div class="status-chip">Registration</div>
       <h2 class="section-title">挂号排班</h2>
-      <p class="section-desc">先看科室，再看日期，下面展示当天可挂号的医生排班。</p>
+      <p class="section-desc">下面只展示从今天开始 1 周内仍可预约的医生排班。</p>
 
       <el-alert
         v-if="isPreview"
@@ -453,7 +465,7 @@ onMounted(async () => {
 
         <el-empty
           v-if="!loadingSchedules && !filteredSchedules.length"
-          description="当前科室在已加载日期下没有可展示的排班"
+          description="当前科室在未来 1 周内没有可挂号的排班"
           class="empty-block"
         />
 

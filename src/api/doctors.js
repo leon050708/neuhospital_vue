@@ -15,3 +15,26 @@ export function getDoctorPage(params) {
     params
   })
 }
+
+export function getDoctorDetail(id) {
+  return request({
+    url: `/doctors/${id}`,
+    method: 'get'
+  })
+}
+
+export function createDoctor(data) {
+  return request({
+    url: '/doctors',
+    method: 'post',
+    data
+  })
+}
+
+export function updateDoctor(id, data) {
+  return request({
+    url: `/doctors/${id}`,
+    method: 'put',
+    data
+  })
+}

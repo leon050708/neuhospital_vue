@@ -41,32 +41,107 @@ const currentProfile = computed(() => {
 const currentUserType = computed(() => currentProfile.value?.userType || '')
 const currentRole = computed(() => currentProfile.value?.role || '')
 
+function buildMenuItem(label, path, activePrefixes = []) {
+  return {
+    label,
+    path,
+    activePrefixes: [path, ...activePrefixes]
+  }
+}
+
+function buildMenuGroup(label, path, children, activePrefixes = []) {
+  return {
+    label,
+    path,
+    children,
+    activePrefixes: [path, ...activePrefixes]
+  }
+}
+
 const menuItems = computed(() => {
   if (previewMode.value) {
     if (currentUserType.value === 'PATIENT') {
       return [
-        { label: '患者档案', path: '/preview/patient/profile' },
-        { label: '我的病例', path: '/preview/patient/records' },
-        { label: '挂号排班', path: '/preview/patient/registration' },
-        { label: '订单支付', path: '/preview/patient/orders' },
-        { label: 'AI 问诊', path: '/preview/patient/consult' }
+        buildMenuItem('患者档案', '/preview/patient/profile'),
+        buildMenuGroup(
+          '我的病例',
+          '/preview/patient/records/list',
+          [
+            buildMenuItem('病例列表', '/preview/patient/records/list'),
+            buildMenuItem('病例详情', '/preview/patient/records/detail')
+          ],
+          ['/preview/patient/records']
+        ),
+        buildMenuItem('挂号排班', '/preview/patient/registration'),
+        buildMenuGroup(
+          '订单支付',
+          '/preview/patient/orders/registrations',
+          [
+            buildMenuItem('我的挂号', '/preview/patient/orders/registrations'),
+            buildMenuItem('待支付', '/preview/patient/orders/payments')
+          ],
+          ['/preview/patient/orders']
+        ),
+        buildMenuItem('AI 问诊', '/preview/patient/consult')
       ]
     }
 
     if (currentUserType.value === 'DOCTOR') {
       return [
-        { label: '候诊队列', path: '/preview/doctor/queue' },
-        { label: '病历诊断', path: '/preview/doctor/records' },
-        { label: '检查处方', path: '/preview/doctor/orders' },
-        { label: 'CT 分析', path: '/preview/doctor/ct-analysis' }
+        buildMenuItem('候诊队列', '/preview/doctor/queue'),
+        buildMenuGroup(
+          '病历诊断',
+          '/preview/doctor/records/consultation',
+          [
+            buildMenuItem('当前接诊', '/preview/doctor/records/consultation'),
+            buildMenuItem('病历记录', '/preview/doctor/records/history')
+          ],
+          ['/preview/doctor/records']
+        ),
+        buildMenuGroup(
+          '检查处方',
+          '/preview/doctor/orders/check',
+          [
+            buildMenuItem('检查申请', '/preview/doctor/orders/check'),
+            buildMenuItem('检验申请', '/preview/doctor/orders/inspection'),
+            buildMenuItem('处方发药', '/preview/doctor/orders/prescription')
+          ],
+          ['/preview/doctor/orders']
+        ),
+        buildMenuItem('CT 分析', '/preview/doctor/ct-analysis')
       ]
     }
 
     return [
-      { label: '科室医生', path: '/preview/management/departments' },
-      { label: '排班号源', path: '/preview/management/schedules' },
-      { label: '患者挂号', path: '/preview/management/patients' },
-      { label: '资产文件', path: '/preview/management/assets' }
+      buildMenuGroup(
+        '科室医生',
+        '/preview/management/departments/list',
+        [
+          buildMenuItem('科室列表', '/preview/management/departments/list'),
+          buildMenuItem('医生分页', '/preview/management/departments/doctors')
+        ],
+        ['/preview/management/departments']
+      ),
+      buildMenuGroup(
+        '排班号源',
+        '/preview/management/schedules/templates',
+        [
+          buildMenuItem('排班模板', '/preview/management/schedules/templates'),
+          buildMenuItem('排班实例', '/preview/management/schedules/instances')
+        ],
+        ['/preview/management/schedules']
+      ),
+      buildMenuItem('患者挂号', '/preview/management/patients'),
+      buildMenuGroup(
+        '资产文件',
+        '/preview/management/assets/drugs',
+        [
+          buildMenuItem('药品库存', '/preview/management/assets/drugs'),
+          buildMenuItem('文件记录', '/preview/management/assets/files'),
+          buildMenuItem('知识库上传', '/preview/management/assets/knowledge')
+        ],
+        ['/preview/management/assets']
+      )
     ]
   }
 
@@ -74,42 +149,111 @@ const menuItems = computed(() => {
 
   if (currentUserType.value === 'PATIENT') {
     baseItems.push(
-      { label: '患者档案', path: '/workspace/patient/profile' },
-      { label: '我的病例', path: '/workspace/patient/records' },
-      { label: '挂号排班', path: '/workspace/patient/registration' },
-      { label: '订单支付', path: '/workspace/patient/orders' },
-      { label: 'AI 问诊', path: '/workspace/patient/consult' }
+      buildMenuItem('患者档案', '/workspace/patient/profile'),
+      buildMenuGroup(
+        '我的病例',
+        '/workspace/patient/records/list',
+        [
+          buildMenuItem('病例列表', '/workspace/patient/records/list'),
+          buildMenuItem('病例详情', '/workspace/patient/records/detail')
+        ],
+        ['/workspace/patient/records']
+      ),
+      buildMenuItem('挂号排班', '/workspace/patient/registration'),
+      buildMenuGroup(
+        '订单支付',
+        '/workspace/patient/orders/registrations',
+        [
+          buildMenuItem('我的挂号', '/workspace/patient/orders/registrations'),
+          buildMenuItem('待支付', '/workspace/patient/orders/payments')
+        ],
+        ['/workspace/patient/orders']
+      ),
+      buildMenuItem('AI 问诊', '/workspace/patient/consult')
     )
   }
 
   if (currentUserType.value === 'DOCTOR') {
     baseItems.push(
-      { label: '候诊队列', path: '/workspace/doctor/queue' },
-      { label: '病历诊断', path: '/workspace/doctor/records' },
-      { label: '检查处方', path: '/workspace/doctor/orders' },
-      { label: 'CT 分析', path: '/workspace/doctor/ct-analysis' }
+      buildMenuItem('候诊队列', '/workspace/doctor/queue'),
+      buildMenuGroup(
+        '病历诊断',
+        '/workspace/doctor/records/consultation',
+        [
+          buildMenuItem('当前接诊', '/workspace/doctor/records/consultation'),
+          buildMenuItem('病历记录', '/workspace/doctor/records/history')
+        ],
+        ['/workspace/doctor/records']
+      ),
+      buildMenuGroup(
+        '检查处方',
+        '/workspace/doctor/orders/check',
+        [
+          buildMenuItem('检查申请', '/workspace/doctor/orders/check'),
+          buildMenuItem('检验申请', '/workspace/doctor/orders/inspection'),
+          buildMenuItem('处方发药', '/workspace/doctor/orders/prescription')
+        ],
+        ['/workspace/doctor/orders']
+      ),
+      buildMenuItem('CT 分析', '/workspace/doctor/ct-analysis')
     )
   }
 
-  if (currentUserType.value === 'MANAGEMENT') {
+  if (currentUserType.value === 'MANAGEMENT' || currentUserType.value === 'ADMIN') {
     baseItems.push(
-      { label: '科室医生', path: '/workspace/management/departments' },
-      { label: '排班号源', path: '/workspace/management/schedules' },
-      { label: '患者挂号', path: '/workspace/management/patients' },
-      { label: '资产文件', path: '/workspace/management/assets' }
+      buildMenuGroup(
+        '科室医生',
+        '/workspace/management/departments/list',
+        [
+          buildMenuItem('科室列表', '/workspace/management/departments/list'),
+          buildMenuItem('医生分页', '/workspace/management/departments/doctors')
+        ],
+        ['/workspace/management/departments']
+      ),
+      buildMenuGroup(
+        '排班号源',
+        '/workspace/management/schedules/templates',
+        [
+          buildMenuItem('排班模板', '/workspace/management/schedules/templates'),
+          buildMenuItem('排班实例', '/workspace/management/schedules/instances')
+        ],
+        ['/workspace/management/schedules']
+      ),
+      buildMenuItem('患者挂号', '/workspace/management/patients'),
+      buildMenuGroup(
+        '资产文件',
+        '/workspace/management/assets/drugs',
+        [
+          buildMenuItem('药品库存', '/workspace/management/assets/drugs'),
+          buildMenuItem('文件记录', '/workspace/management/assets/files'),
+          buildMenuItem('知识库上传', '/workspace/management/assets/knowledge')
+        ],
+        ['/workspace/management/assets']
+      )
     )
   }
 
   return baseItems
 })
 
-const activeMenu = computed(() => route.path)
+function isMenuActive(item) {
+  return item.activePrefixes?.some((prefix) => route.path === prefix || route.path.startsWith(`${prefix}/`))
+}
+
+function handleMenuClick(item) {
+  if (item.children?.length && isMenuActive(item)) {
+    return
+  }
+
+  router.push(item.path)
+}
 
 const welcomeText = computed(() => {
   const map = {
     PATIENT: '患者服务台',
     DOCTOR: '医生工作站',
-    MANAGEMENT: '管理控制台'
+    MANAGEMENT: '管理控制台',
+    ADMIN: '管理控制台'
   }
 
   if (previewMode.value) {
@@ -133,30 +277,58 @@ async function handleLogout() {
 
 <template>
   <div class="portal-layout page-shell">
-    <aside class="portal-sidebar">
-      <div class="brand-panel">
-        <div class="brand-mark">RH</div>
-        <div>
-          <div class="brand-title">智慧云脑诊疗平台</div>
-          <div class="brand-subtitle">{{ welcomeText }}</div>
+    <header class="portal-header glass-card">
+      <div class="header-brand">
+        <div class="brand-panel">
+          <div class="brand-mark">RH</div>
+          <div>
+            <div class="brand-title">智慧云脑诊疗平台</div>
+            <div class="brand-subtitle">{{ welcomeText }}</div>
+          </div>
         </div>
       </div>
 
-      <div class="sidebar-divider"></div>
+      <div class="header-actions">
+        <div class="header-caption">{{ previewMode ? '临时预览模式' : '当前业务工作区' }}</div>
+        <div class="header-action-row">
+          <el-button round type="primary" @click="handleLogout">
+            {{ previewMode ? '返回登录' : '退出登录' }}
+          </el-button>
+        </div>
+      </div>
+    </header>
 
+    <aside class="portal-sidebar">
       <nav class="sidebar-nav">
-        <button
+        <div
           v-for="item in menuItems"
           :key="item.path"
-          class="nav-button"
-          :class="{ 'is-active': activeMenu === item.path }"
-          @click="router.push(item.path)"
+          class="nav-group"
         >
-          {{ item.label }}
-        </button>
+          <button
+            class="nav-button"
+            :class="{ 'is-active': isMenuActive(item), 'has-children': item.children?.length }"
+            @click="handleMenuClick(item)"
+          >
+            <span>{{ item.label }}</span>
+            <span v-if="item.children?.length" class="nav-caret">{{ isMenuActive(item) ? '−' : '+' }}</span>
+          </button>
+
+          <div v-if="item.children?.length && isMenuActive(item)" class="subnav-list">
+            <button
+              v-for="child in item.children"
+              :key="child.path"
+              class="subnav-button"
+              :class="{ 'is-active': isMenuActive(child) }"
+              @click="router.push(child.path)"
+            >
+              {{ child.label }}
+            </button>
+          </div>
+        </div>
       </nav>
 
-      <div class="sidebar-footer">
+      <div class="sidebar-footer glass-card">
         <div class="sidebar-caption">Access Identity</div>
         <div class="sidebar-user">{{ currentProfile?.username || '未登录' }}</div>
         <div class="sidebar-role">{{ currentUserType || 'GUEST' }} / {{ currentRole || 'NO_ROLE' }}</div>
@@ -164,19 +336,6 @@ async function handleLogout() {
     </aside>
 
     <div class="portal-main">
-      <header class="portal-header glass-card">
-        <div>
-          <div class="header-kicker">Clinical Intelligence Workspace</div>
-          <h1 class="header-title">{{ route.meta?.title || '业务页面' }}</h1>
-        </div>
-        <div class="header-actions">
-          <div class="status-chip">{{ previewMode ? '临时预览模式' : '当前业务工作区' }}</div>
-          <el-button round type="primary" @click="handleLogout">
-            {{ previewMode ? '返回登录' : '退出登录' }}
-          </el-button>
-        </div>
-      </header>
-
       <main class="portal-content">
         <router-view />
       </main>
@@ -188,17 +347,33 @@ async function handleLogout() {
 .portal-layout {
   display: grid;
   grid-template-columns: 280px 1fr;
+  grid-template-rows: auto 1fr;
+  min-height: 100vh;
+}
+
+.portal-header {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  margin: 18px 18px 0;
+  padding: 18px 22px;
+  border-radius: var(--radius-lg);
 }
 
 .portal-sidebar {
+  grid-row: 2;
   position: relative;
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
-  padding: 28px 20px;
-  background: var(--bg-sidebar);
+  min-height: 0;
+  margin: 18px 0 18px 18px;
+  padding: 18px;
+  background: linear-gradient(180deg, rgba(177, 191, 198, 0.78) 0%, rgba(202, 217, 223, 0.72) 100%);
   color: var(--text-primary);
   border-right: 1px solid rgba(255, 255, 255, 0.56);
+  border-radius: var(--radius-lg);
 }
 
 .portal-sidebar::before {
@@ -209,14 +384,14 @@ async function handleLogout() {
   content: '';
 }
 
+.header-brand {
+  min-width: 0;
+}
+
 .brand-panel {
   display: flex;
   gap: 14px;
   align-items: center;
-  padding: 18px;
-  border-radius: 6px;
-  background: rgba(247, 250, 251, 0.52);
-  border: 1px solid rgba(255, 255, 255, 0.48);
 }
 
 .brand-mark {
@@ -243,20 +418,42 @@ async function handleLogout() {
   font-size: 13px;
 }
 
-.sidebar-divider {
-  height: 1px;
-  margin: 24px 4px 10px;
-  background: linear-gradient(90deg, rgba(111, 200, 184, 0.45), rgba(121, 189, 224, 0.14), transparent);
+.header-actions {
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+}
+
+.header-caption {
+  color: var(--text-muted);
+  font-family: 'Barlow', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.header-action-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
 }
 
 .sidebar-nav {
   display: grid;
   gap: 8px;
-  margin-top: 16px;
+}
+
+.nav-group {
+  display: grid;
+  gap: 8px;
 }
 
 .nav-button {
   width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   padding: 14px 16px;
   border: 1px solid transparent;
   border-radius: 6px;
@@ -272,6 +469,10 @@ async function handleLogout() {
   transition: 0.2s ease;
 }
 
+.nav-button.has-children {
+  font-weight: 800;
+}
+
 .nav-button:hover,
 .nav-button.is-active {
   background: rgba(248, 252, 253, 0.76);
@@ -279,12 +480,43 @@ async function handleLogout() {
   color: var(--text-primary);
 }
 
+.nav-caret {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.subnav-list {
+  display: grid;
+  gap: 6px;
+  margin: -2px 0 4px;
+  padding-left: 12px;
+}
+
+.subnav-button {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid rgba(121, 189, 224, 0.12);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--text-secondary);
+  text-align: left;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.subnav-button:hover,
+.subnav-button.is-active {
+  background: rgba(248, 252, 253, 0.72);
+  border-color: rgba(121, 189, 224, 0.28);
+  color: var(--text-primary);
+}
+
 .sidebar-footer {
   margin-top: auto;
   padding: 18px;
   border-radius: 6px;
-  background: rgba(248, 251, 252, 0.56);
-  border: 1px solid rgba(255, 255, 255, 0.46);
 }
 
 .sidebar-caption {
@@ -308,70 +540,51 @@ async function handleLogout() {
 }
 
 .portal-main {
+  grid-row: 2;
   min-width: 0;
-  padding: 24px;
-}
-
-.portal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 20px;
-  padding: 22px 28px;
-  border-radius: var(--radius-lg);
-  background: linear-gradient(180deg, rgba(252, 254, 255, 0.86) 0%, rgba(240, 246, 248, 0.84) 100%);
-}
-
-.header-kicker {
-  color: var(--text-muted);
-  font-family: 'Barlow', sans-serif;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-}
-
-.header-title {
-  margin: 8px 0 0;
-  font-size: 32px;
-  font-weight: 900;
-  letter-spacing: -0.04em;
-}
-
-.header-actions {
-  display: flex;
-  gap: 12px;
-  align-items: center;
+  padding: 18px 18px 18px 20px;
 }
 
 .portal-content {
-  padding: 24px 0;
+  padding: 0;
 }
 
 @media (max-width: 1100px) {
   .portal-layout {
     grid-template-columns: 1fr;
+    grid-template-rows: auto auto 1fr;
   }
 
   .portal-sidebar {
-    min-height: auto;
+    grid-row: 2;
+    margin: 0 18px 18px;
+  }
+
+  .portal-main {
+    grid-row: 3;
+    padding: 0 18px 18px;
   }
 }
 
 @media (max-width: 768px) {
-  .portal-main {
-    padding: 16px;
-  }
-
   .portal-header {
     flex-direction: column;
     align-items: flex-start;
-    padding: 20px;
+    margin: 16px 16px 0;
+    padding: 16px 18px;
   }
 
   .header-actions {
     width: 100%;
-    flex-wrap: wrap;
+    justify-items: start;
+  }
+
+  .portal-main {
+    padding: 16px;
+  }
+
+  .portal-sidebar {
+    margin: 0 16px 16px;
   }
 }
 </style>

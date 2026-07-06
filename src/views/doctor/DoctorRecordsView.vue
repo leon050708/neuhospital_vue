@@ -21,6 +21,7 @@ const authStore = useAuthStore()
 
 const isPreview = computed(() => Boolean(route.meta?.preview))
 const doctorId = computed(() => authStore.profile?.bizId)
+const currentSection = computed(() => route.meta?.section === 'history' ? 'history' : 'consultation')
 
 const loading = ref(false)
 const detailLoading = ref(false)
@@ -416,7 +417,7 @@ onMounted(async () => {
 
       <template v-else>
         <el-alert
-          v-if="isConsultationMode"
+          v-if="currentSection === 'consultation' && isConsultationMode"
           title="当前已从候诊队列进入接诊，可先保存病历，再开检查/检验/处方，最后确认病历并完成就诊。"
           type="success"
           :closable="false"
@@ -424,14 +425,14 @@ onMounted(async () => {
           class="notice"
         />
 
-        <div v-if="isConsultationMode" class="context-bar">
+        <div v-if="currentSection === 'consultation' && isConsultationMode" class="context-bar">
           <span>queueNo: {{ consultationContext.queueNo || '--' }}</span>
           <span>registrationNo: {{ consultationContext.registrationNo || '--' }}</span>
           <span>patientId: {{ consultationContext.patientId || '--' }}</span>
           <span>registrationId: {{ consultationContext.registrationId || '--' }}</span>
         </div>
 
-        <div v-if="isConsultationMode" class="section-grid consult-grid">
+        <div v-if="currentSection === 'consultation' && isConsultationMode" class="section-grid consult-grid">
           <article class="sub-card">
             <div class="card-head">
               <h3>当前接诊病历</h3>
@@ -492,7 +493,14 @@ onMounted(async () => {
           </article>
         </div>
 
+        <el-empty
+          v-if="currentSection === 'consultation' && !isConsultationMode"
+          description="当前页面用于从候诊队列进入接诊，请先在候诊队列选择患者"
+          class="detail-block"
+        />
+
         <el-table
+          v-if="currentSection === 'history'"
           :data="records"
           v-loading="loading"
           class="table-block"
@@ -514,10 +522,10 @@ onMounted(async () => {
           </el-table-column>
         </el-table>
 
-        <div class="list-footer">当前共 {{ total }} 条病历记录</div>
+        <div v-if="currentSection === 'history'" class="list-footer">当前共 {{ total }} 条病历记录</div>
 
         <el-descriptions
-          v-if="!isConsultationMode && selectedRecord"
+          v-if="currentSection === 'history' && selectedRecord"
           :column="2"
           border
           class="detail-block"

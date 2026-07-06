@@ -1,7 +1,7 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import {
   cancelRegistration,
@@ -14,6 +14,7 @@ import { useAuthStore } from '@/stores/auth'
 import { unwrapResult } from '@/utils/result'
 
 const route = useRoute()
+const router = useRouter()
 const authStore = useAuthStore()
 
 const isPreview = computed(() => Boolean(route.meta?.preview))
@@ -92,6 +93,10 @@ function canCheckInRegistration(row) {
   return row?.status === 'PAID' && isToday(row?.visitDate)
 }
 
+function resolveOrderSection() {
+  return route.meta?.orderSection === 'payments' ? 'payments' : 'registrations'
+}
+
 async function loadRegistrations() {
   if (isPreview.value || !patientId.value) {
     return
@@ -144,6 +149,18 @@ async function viewRegistrationDetail(id) {
   } finally {
     detailLoading.value = false
   }
+}
+
+function openRegistrationDetail(id) {
+  const basePath = route.meta?.preview ? '/preview/patient/orders/registrations' : '/workspace/patient/orders/registrations'
+  router.push({
+    path: basePath,
+    query: {
+      ...route.query,
+      registrationId: id
+    }
+  })
+  viewRegistrationDetail(id)
 }
 
 async function handleCancel(id) {
@@ -209,8 +226,31 @@ async function handlePay(row) {
 }
 
 onMounted(async () => {
+  activeTab.value = resolveOrderSection()
   await Promise.all([loadRegistrations(), loadPendingPayments()])
+  if (route.query.registrationId) {
+    await viewRegistrationDetail(route.query.registrationId)
+  }
 })
+
+watch(
+  () => route.meta?.orderSection,
+  () => {
+    activeTab.value = resolveOrderSection()
+  }
+)
+
+watch(
+  () => route.query.registrationId,
+  async (registrationId) => {
+    if (registrationId) {
+      await viewRegistrationDetail(registrationId)
+      return
+    }
+
+    selectedRegistration.value = null
+  }
+)
 </script>
 
 <template>
@@ -266,7 +306,7 @@ onMounted(async () => {
             <el-table-column label="操作" min-width="220" fixed="right">
               <template #default="{ row }">
                 <div class="row-actions">
-                  <el-button link type="primary" @click="viewRegistrationDetail(row.id)">详情</el-button>
+                  <el-button link type="primary" @click="openRegistrationDetail(row.id)">详情</el-button>
                   <el-button
                     v-if="canCancelRegistration(row)"
                     link
@@ -379,5 +419,9 @@ onMounted(async () => {
 
 .list-footer {
   color: var(--text-secondary);
+}
+
+.tabs-block :deep(.el-tabs__header) {
+  display: none;
 }
 </style>

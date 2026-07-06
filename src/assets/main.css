@@ -129,6 +129,17 @@ a {
   gap: 20px;
 }
 
+.portal-content .status-chip,
+.portal-content .section-title,
+.portal-content .section-desc {
+  display: none !important;
+}
+
+.portal-content .page-header {
+  min-height: 0;
+  margin-bottom: 0;
+}
+
 .hud-label {
   display: inline-flex;
   align-items: center;

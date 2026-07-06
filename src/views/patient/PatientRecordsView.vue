@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import {
   getOutpatientRecordDetail,
@@ -12,6 +12,7 @@ import { useAuthStore } from '@/stores/auth'
 import { unwrapResult } from '@/utils/result'
 
 const route = useRoute()
+const router = useRouter()
 const authStore = useAuthStore()
 
 const isPreview = computed(() => Boolean(route.meta?.preview))
@@ -29,6 +30,8 @@ const query = reactive({
   pageNo: 1,
   pageSize: 10
 })
+
+const currentSection = computed(() => route.meta?.section === 'detail' ? 'detail' : 'list')
 
 function getErrorMessage(error, fallback) {
   return error?.response?.data?.message || error?.message || fallback
@@ -80,7 +83,8 @@ async function loadRecords() {
       return
     }
 
-    const matchedRecord = records.value.find((item) => String(item.id) === activeRecordId.value) || records.value[0]
+    const targetRecordId = typeof route.query.recordId === 'string' ? route.query.recordId : activeRecordId.value
+    const matchedRecord = records.value.find((item) => String(item.id) === String(targetRecordId)) || records.value[0]
     await loadRecordDetail(matchedRecord.id, { silent: true })
   } catch (error) {
     ElMessage.error(getErrorMessage(error, '加载病例列表失败'))
@@ -121,7 +125,23 @@ async function loadRecordDetail(recordId, { silent = false } = {}) {
   }
 }
 
+function openRecordDetail(recordId) {
+  const basePath = route.meta?.preview ? '/preview/patient/records/detail' : '/workspace/patient/records/detail'
+  router.push({
+    path: basePath,
+    query: {
+      ...route.query,
+      recordId
+    }
+  })
+}
+
 watch(() => query.pageNo, loadRecords)
+watch(() => route.query.recordId, (recordId) => {
+  if (recordId) {
+    loadRecordDetail(recordId)
+  }
+})
 
 onMounted(loadRecords)
 </script>
@@ -152,8 +172,7 @@ onMounted(loadRecords)
       />
 
       <template v-else>
-        <div class="records-layout">
-          <div class="records-table">
+        <div v-if="currentSection === 'list'" class="records-table">
             <el-table
               :data="records"
               v-loading="loading"
@@ -175,7 +194,7 @@ onMounted(loadRecords)
               </el-table-column>
               <el-table-column label="操作" min-width="100" fixed="right">
                 <template #default="{ row }">
-                  <el-button text type="primary" @click="loadRecordDetail(row.id)">
+                  <el-button text type="primary" @click="openRecordDetail(row.id)">
                     查看
                   </el-button>
                 </template>
@@ -192,10 +211,23 @@ onMounted(loadRecords)
               layout="prev, pager, next"
               class="table-pagination"
             />
-          </div>
+        </div>
 
-          <div class="record-detail glass-subcard" v-loading="detailLoading">
-            <h3>病例详情</h3>
+        <div v-else class="record-detail glass-subcard" v-loading="detailLoading">
+            <el-select
+              v-if="records.length"
+              :model-value="activeRecordId"
+              placeholder="选择病例"
+              class="record-selector"
+              @change="openRecordDetail"
+            >
+              <el-option
+                v-for="item in records"
+                :key="item.id"
+                :label="item.recordNo || `病例 ${item.id}`"
+                :value="String(item.id)"
+              />
+            </el-select>
 
             <el-empty v-if="!selectedRecord" description="请选择一条病例查看详情" />
 
@@ -242,7 +274,6 @@ onMounted(loadRecords)
               </div>
             </template>
           </div>
-        </div>
       </template>
     </article>
   </section>
@@ -258,16 +289,10 @@ onMounted(loadRecords)
   margin-top: 20px;
 }
 
-.records-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
-  gap: 20px;
-  margin-top: 20px;
-}
-
 .records-table,
 .record-detail {
   min-width: 0;
+  margin-top: 20px;
 }
 
 .glass-subcard {
@@ -298,9 +323,11 @@ onMounted(loadRecords)
   margin-top: 20px;
 }
 
+.record-selector {
+  width: 100%;
+  margin-bottom: 16px;
+}
+
 @media (max-width: 1180px) {
-  .records-layout {
-    grid-template-columns: 1fr;
-  }
 }
 </style>
