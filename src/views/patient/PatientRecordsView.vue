@@ -126,9 +126,8 @@ async function loadRecordDetail(recordId, { silent = false } = {}) {
 }
 
 function openRecordDetail(recordId) {
-  const basePath = route.meta?.preview ? '/preview/patient/records/detail' : '/workspace/patient/records/detail'
   router.push({
-    path: basePath,
+    path: '/workspace/patient/records/detail',
     query: {
       ...route.query,
       recordId

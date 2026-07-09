@@ -9,34 +9,7 @@ const authStore = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 
-const previewMode = computed(() => Boolean(route.meta?.preview))
-
-const previewProfile = computed(() => {
-  const previewUserType = route.meta?.previewUserType || 'PATIENT'
-  const profileMap = {
-    PATIENT: {
-      username: 'preview_patient',
-      userType: 'PATIENT',
-      role: 'PATIENT'
-    },
-    DOCTOR: {
-      username: 'preview_doctor',
-      userType: 'DOCTOR',
-      role: 'DOCTOR'
-    },
-    MANAGEMENT: {
-      username: 'preview_admin',
-      userType: 'MANAGEMENT',
-      role: 'ADMIN'
-    }
-  }
-
-  return profileMap[previewUserType] || profileMap.PATIENT
-})
-
-const currentProfile = computed(() => {
-  return previewMode.value ? previewProfile.value : authStore.profile
-})
+const currentProfile = computed(() => authStore.profile)
 
 const currentUserType = computed(() => currentProfile.value?.userType || '')
 const currentRole = computed(() => currentProfile.value?.role || '')
@@ -59,92 +32,6 @@ function buildMenuGroup(label, path, children, activePrefixes = []) {
 }
 
 const menuItems = computed(() => {
-  if (previewMode.value) {
-    if (currentUserType.value === 'PATIENT') {
-      return [
-        buildMenuItem('患者档案', '/preview/patient/profile'),
-        buildMenuGroup(
-          '我的病例',
-          '/preview/patient/records/list',
-          [
-            buildMenuItem('病例列表', '/preview/patient/records/list'),
-            buildMenuItem('病例详情', '/preview/patient/records/detail')
-          ],
-          ['/preview/patient/records']
-        ),
-        buildMenuItem('挂号排班', '/preview/patient/registration'),
-        buildMenuGroup(
-          '订单支付',
-          '/preview/patient/orders/registrations',
-          [
-            buildMenuItem('我的挂号', '/preview/patient/orders/registrations'),
-            buildMenuItem('待支付', '/preview/patient/orders/payments')
-          ],
-          ['/preview/patient/orders']
-        ),
-        buildMenuItem('AI 问诊', '/preview/patient/consult')
-      ]
-    }
-
-    if (currentUserType.value === 'DOCTOR') {
-      return [
-        buildMenuItem('候诊队列', '/preview/doctor/queue'),
-        buildMenuGroup(
-          '病历诊断',
-          '/preview/doctor/records/consultation',
-          [
-            buildMenuItem('当前接诊', '/preview/doctor/records/consultation'),
-            buildMenuItem('病历记录', '/preview/doctor/records/history')
-          ],
-          ['/preview/doctor/records']
-        ),
-        buildMenuGroup(
-          '检查处方',
-          '/preview/doctor/orders/check',
-          [
-            buildMenuItem('检查申请', '/preview/doctor/orders/check'),
-            buildMenuItem('检验申请', '/preview/doctor/orders/inspection'),
-            buildMenuItem('处方发药', '/preview/doctor/orders/prescription')
-          ],
-          ['/preview/doctor/orders']
-        ),
-        buildMenuItem('CT 分析', '/preview/doctor/ct-analysis')
-      ]
-    }
-
-    return [
-      buildMenuGroup(
-        '科室医生',
-        '/preview/management/departments/list',
-        [
-          buildMenuItem('科室列表', '/preview/management/departments/list'),
-          buildMenuItem('医生分页', '/preview/management/departments/doctors')
-        ],
-        ['/preview/management/departments']
-      ),
-      buildMenuGroup(
-        '排班号源',
-        '/preview/management/schedules/templates',
-        [
-          buildMenuItem('排班模板', '/preview/management/schedules/templates'),
-          buildMenuItem('排班实例', '/preview/management/schedules/instances')
-        ],
-        ['/preview/management/schedules']
-      ),
-      buildMenuItem('患者挂号', '/preview/management/patients'),
-      buildMenuGroup(
-        '资产文件',
-        '/preview/management/assets/drugs',
-        [
-          buildMenuItem('药品库存', '/preview/management/assets/drugs'),
-          buildMenuItem('文件记录', '/preview/management/assets/files'),
-          buildMenuItem('知识库上传', '/preview/management/assets/knowledge')
-        ],
-        ['/preview/management/assets']
-      )
-    ]
-  }
-
   const baseItems = []
 
   if (currentUserType.value === 'PATIENT') {
@@ -159,7 +46,7 @@ const menuItems = computed(() => {
         ],
         ['/workspace/patient/records']
       ),
-      buildMenuItem('挂号排班', '/workspace/patient/registration'),
+      buildMenuItem('挂号', '/workspace/patient/registration'),
       buildMenuGroup(
         '订单支付',
         '/workspace/patient/orders/registrations',
@@ -184,18 +71,21 @@ const menuItems = computed(() => {
           buildMenuItem('病历记录', '/workspace/doctor/records/history')
         ],
         ['/workspace/doctor/records']
-      ),
+      )
+    )
+  }
+
+  if (currentUserType.value === 'PHARMACIST' || currentUserType.value === 'PHARMACY') {
+    baseItems.push(
       buildMenuGroup(
-        '检查处方',
-        '/workspace/doctor/orders/check',
+        '药房工作台',
+        '/workspace/pharmacy/drugs',
         [
-          buildMenuItem('检查申请', '/workspace/doctor/orders/check'),
-          buildMenuItem('检验申请', '/workspace/doctor/orders/inspection'),
-          buildMenuItem('处方发药', '/workspace/doctor/orders/prescription')
+          buildMenuItem('药品管理', '/workspace/pharmacy/drugs'),
+          buildMenuItem('发药工作台', '/workspace/pharmacy/dispense')
         ],
-        ['/workspace/doctor/orders']
-      ),
-      buildMenuItem('CT 分析', '/workspace/doctor/ct-analysis')
+        ['/workspace/pharmacy']
+      )
     )
   }
 
@@ -222,9 +112,8 @@ const menuItems = computed(() => {
       buildMenuItem('患者挂号', '/workspace/management/patients'),
       buildMenuGroup(
         '资产文件',
-        '/workspace/management/assets/drugs',
+        '/workspace/management/assets/files',
         [
-          buildMenuItem('药品库存', '/workspace/management/assets/drugs'),
           buildMenuItem('文件记录', '/workspace/management/assets/files'),
           buildMenuItem('知识库上传', '/workspace/management/assets/knowledge')
         ],
@@ -252,23 +141,16 @@ const welcomeText = computed(() => {
   const map = {
     PATIENT: '患者服务台',
     DOCTOR: '医生工作站',
+    PHARMACIST: '药房工作台',
+    PHARMACY: '药房工作台',
     MANAGEMENT: '管理控制台',
     ADMIN: '管理控制台'
-  }
-
-  if (previewMode.value) {
-    return `${map[currentUserType.value] || '三端工作区'} · 临时预览`
   }
 
   return map[currentUserType.value] || '智慧云脑诊疗平台'
 })
 
 async function handleLogout() {
-  if (previewMode.value) {
-    router.push('/login')
-    return
-  }
-
   await authStore.logout()
   ElMessage.success('已退出登录')
   router.push('/login')
@@ -289,10 +171,10 @@ async function handleLogout() {
       </div>
 
       <div class="header-actions">
-        <div class="header-caption">{{ previewMode ? '临时预览模式' : '当前业务工作区' }}</div>
+        <div class="header-caption">当前业务工作区</div>
         <div class="header-action-row">
           <el-button round type="primary" @click="handleLogout">
-            {{ previewMode ? '返回登录' : '退出登录' }}
+            退出登录
           </el-button>
         </div>
       </div>

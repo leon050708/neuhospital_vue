@@ -1,19 +1,21 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import { createCheckRequest, getCheckRequestDetail, getCheckRequestsPage, cancelCheckRequest } from '@/api/checkRequests'
 import { confirmCheckResult, createCheckResult, getCheckResultDetail } from '@/api/checkResults'
 import { createInspectionRequest, getInspectionRequestDetail, getInspectionRequestsPage, cancelInspectionRequest } from '@/api/inspectionRequests'
 import { confirmInspectionResult, createInspectionResult, getInspectionResultDetail } from '@/api/inspectionResults'
+import { confirmOutpatientRecord } from '@/api/outpatientRecords'
 import { getDrugPage } from '@/api/drugs'
-import { dispensePrescription } from '@/api/pharmacy'
 import { createPrescription, getPrescriptionDetail, getPrescriptionsPage } from '@/api/prescriptions'
+import { finishQueuePatient } from '@/api/queue'
 import { useAuthStore } from '@/stores/auth'
 import { unwrapResult } from '@/utils/result'
 
 const route = useRoute()
+const router = useRouter()
 const authStore = useAuthStore()
 
 const isPreview = computed(() => Boolean(route.meta?.preview))
@@ -72,6 +74,7 @@ const prescriptionForm = reactive({
   registrationId: '',
   medicalRecordId: '',
   departmentId: '',
+  prescriptionType: 'WESTERN',
   remark: '',
   items: [
     {
@@ -79,7 +82,6 @@ const prescriptionForm = reactive({
       dosage: '',
       frequency: '',
       days: 1,
-      quantity: 1,
       usageMethod: ''
     }
   ]
@@ -109,16 +111,47 @@ const inspectionResultForm = reactive({
   ]
 })
 
-const dispenseForm = reactive({
-  prescriptionId: '',
-  pharmacyUserId: ''
-})
-
 const checkResultLookupId = ref('')
 const inspectionResultLookupId = ref('')
+const finishingVisit = ref(false)
+
+const CHECK_ITEM_OPTIONS = [
+  { code: 'CT_HEAD', name: '头颅 CT 平扫', targetDepartmentId: '3001', purpose: '排查颅内出血、骨折和急性损伤' },
+  { code: 'CT_CHEST', name: '胸部 CT', targetDepartmentId: '3001', purpose: '评估肺部感染、结节及胸腔情况' },
+  { code: 'XR_CHEST', name: '胸部 X 线片', targetDepartmentId: '3001', purpose: '初筛肺部与胸廓异常' },
+  { code: 'US_ABDOMEN', name: '腹部彩超', targetDepartmentId: '3002', purpose: '评估肝胆胰脾肾及腹部积液' }
+]
+
+const INSPECTION_ITEM_OPTIONS = [
+  { code: 'CBC', name: '血常规', sampleType: '静脉血', targetDepartmentId: '4001' },
+  { code: 'CRP', name: 'C 反应蛋白', sampleType: '静脉血', targetDepartmentId: '4001' },
+  { code: 'LIVER_FN', name: '肝功能', sampleType: '静脉血', targetDepartmentId: '4001' },
+  { code: 'URINE_RT', name: '尿常规', sampleType: '尿液', targetDepartmentId: '4002' }
+]
+
+const DEPARTMENT_OPTIONS = [
+  { value: '3001', label: '影像科' },
+  { value: '3002', label: '超声科' },
+  { value: '4001', label: '检验科' },
+  { value: '4002', label: '尿检室' }
+]
 
 function getErrorMessage(error, fallback) {
   return error?.response?.data?.message || error?.message || fallback
+}
+
+function getPrescriptionSubmitErrorMessage(error) {
+  const message = getErrorMessage(error, '创建处方失败')
+
+  if (message.includes('Access Denied')) {
+    return '后端拒绝了当前账号的处方提交权限，请检查医生账号是否被允许访问 /api/prescriptions，或重新登录后再试'
+  }
+
+  if (message.includes('prescription_type') || message.includes('PrescriptionMapper.insert')) {
+    return '后端处方服务仍未写入 prescriptionType，当前报错需要后端补齐 PrescriptionCreateReq 和保存逻辑后才能提交成功'
+  }
+
+  return message
 }
 
 function toOptionalNumber(value) {
@@ -129,9 +162,74 @@ function toOptionalNumber(value) {
   return Number(value)
 }
 
+function toOptionalString(value) {
+  return value ? String(value).trim() : ''
+}
+
+function resolveDailyFrequencyTimes(frequency) {
+  const normalized = toOptionalString(frequency).toLowerCase()
+
+  if (!normalized) {
+    return null
+  }
+
+  const chineseMatch = normalized.match(/(?:每日|每天|一日|每晚|每晨)(\d+)次/)
+  if (chineseMatch) {
+    return Number(chineseMatch[1])
+  }
+
+  const englishMap = {
+    qd: 1,
+    qn: 1,
+    bid: 2,
+    tid: 3,
+    qid: 4
+  }
+
+  if (englishMap[normalized]) {
+    return englishMap[normalized]
+  }
+
+  const hourlyMatch = normalized.match(/^q(\d+)h$/)
+  if (hourlyMatch) {
+    const hours = Number(hourlyMatch[1])
+    return hours > 0 ? Math.floor(24 / hours) : null
+  }
+
+  const genericMatch = normalized.match(/(\d+)次/)
+  if (genericMatch) {
+    return Number(genericMatch[1])
+  }
+
+  return null
+}
+
+function calculatePrescriptionQuantity(item) {
+  const dailyTimes = resolveDailyFrequencyTimes(item.frequency)
+  const days = Number(item.days)
+
+  if (!dailyTimes || !days) {
+    return null
+  }
+
+  return dailyTimes * days
+}
+
 function hasRequiredContext(form) {
   return Boolean(form.patientId && form.registrationId && form.medicalRecordId && form.departmentId)
 }
+
+const canReturnToConsultation = computed(() => route.query.source === 'record')
+const canFinishVisitFromPrescription = computed(() => {
+  return Boolean(
+    route.query.source === 'record'
+    && doctorId.value
+    && typeof route.query.medicalRecordId === 'string'
+    && route.query.medicalRecordId
+    && typeof route.query.queueId === 'string'
+    && route.query.queueId
+  )
+})
 
 function applyRecordContextFromQuery() {
   const tab = typeof route.query.tab === 'string' ? route.query.tab : ''
@@ -171,6 +269,78 @@ function applyRecordContextFromQuery() {
 
   if (clinicalDiagnosis) {
     checkForm.clinicalDiagnosis = clinicalDiagnosis
+  }
+}
+
+function handleCheckItemChange(code) {
+  const item = CHECK_ITEM_OPTIONS.find((option) => option.code === code)
+  if (!item) {
+    return
+  }
+
+  checkForm.checkItemCode = item.code
+  checkForm.checkItemName = item.name
+  if (!checkForm.targetDepartmentId) {
+    checkForm.targetDepartmentId = item.targetDepartmentId
+  }
+  if (!checkForm.purpose) {
+    checkForm.purpose = item.purpose
+  }
+}
+
+function handleInspectionItemChange(code) {
+  const item = INSPECTION_ITEM_OPTIONS.find((option) => option.code === code)
+  if (!item) {
+    return
+  }
+
+  inspectionForm.inspectionItemCode = item.code
+  inspectionForm.inspectionItemName = item.name
+  if (!inspectionForm.targetDepartmentId) {
+    inspectionForm.targetDepartmentId = item.targetDepartmentId
+  }
+  if (!inspectionForm.sampleType) {
+    inspectionForm.sampleType = item.sampleType
+  }
+}
+
+function goBackToConsultation() {
+  router.push({
+    path: '/workspace/doctor/records/consultation',
+    query: {
+      source: 'queue',
+      queueId: typeof route.query.queueId === 'string' ? route.query.queueId : '',
+      patientId: typeof route.query.patientId === 'string' ? route.query.patientId : '',
+      registrationId: typeof route.query.registrationId === 'string' ? route.query.registrationId : '',
+      departmentId: typeof route.query.departmentId === 'string' ? route.query.departmentId : ''
+    }
+  })
+}
+
+async function finishVisitFromPrescription() {
+  const medicalRecordId = typeof route.query.medicalRecordId === 'string' ? Number(route.query.medicalRecordId) : NaN
+  const queueId = typeof route.query.queueId === 'string' ? Number(route.query.queueId) : NaN
+
+  if (!medicalRecordId || !queueId || !doctorId.value) {
+    ElMessage.warning('当前缺少病历或候诊上下文，暂时无法直接结束接诊')
+    return
+  }
+
+  finishingVisit.value = true
+
+  try {
+    const confirmResponse = await confirmOutpatientRecord(medicalRecordId)
+    unwrapResult(confirmResponse, '确认病历失败')
+
+    const finishResponse = await finishQueuePatient(queueId, doctorId.value)
+    unwrapResult(finishResponse, '完成就诊失败')
+
+    ElMessage.success('处方已开立，当前接诊已结束')
+    router.replace('/workspace/doctor/queue')
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error, '结束接诊失败'))
+  } finally {
+    finishingVisit.value = false
   }
 }
 
@@ -302,6 +472,29 @@ async function submitInspectionRequest() {
 }
 
 async function submitPrescription() {
+  if (!hasRequiredContext(prescriptionForm)) {
+    ElMessage.warning('请先从病历页带入患者、挂号、病历和科室信息，再创建处方')
+    return
+  }
+
+  const normalizedItems = prescriptionForm.items.map((item) => ({
+    drugId: Number(item.drugId),
+    dosage: toOptionalString(item.dosage),
+    frequency: toOptionalString(item.frequency),
+    days: Number(item.days),
+    quantity: calculatePrescriptionQuantity(item),
+    usageMethod: toOptionalString(item.usageMethod)
+  }))
+
+  const invalidItemIndex = normalizedItems.findIndex((item) => {
+    return !item.drugId || !item.dosage || !item.frequency || !item.days || !item.quantity || !item.usageMethod
+  })
+
+  if (invalidItemIndex >= 0) {
+    ElMessage.warning(`请完整填写第 ${invalidItemIndex + 1} 个药品项，并使用可识别的频次格式，例如“每日3次”或“bid”`)
+    return
+  }
+
   submitting.value = true
 
   try {
@@ -311,20 +504,25 @@ async function submitPrescription() {
       medicalRecordId: Number(prescriptionForm.medicalRecordId),
       doctorId: Number(doctorId.value),
       departmentId: Number(prescriptionForm.departmentId),
-      remark: prescriptionForm.remark,
-      items: prescriptionForm.items.map((item) => ({
-        drugId: Number(item.drugId),
-        dosage: item.dosage,
-        frequency: item.frequency,
-        days: Number(item.days),
-        quantity: Number(item.quantity),
-        usageMethod: item.usageMethod
-      }))
+      prescriptionType: prescriptionForm.prescriptionType,
+      remark: toOptionalString(prescriptionForm.remark),
+      items: normalizedItems
     })
     ElMessage.success(`处方创建成功，ID：${unwrapResult(response, '创建处方失败')}`)
+    prescriptionForm.prescriptionType = 'WESTERN'
+    prescriptionForm.remark = ''
+    prescriptionForm.items = [
+      {
+        drugId: '',
+        dosage: '',
+        frequency: '',
+        days: 1,
+        usageMethod: ''
+      }
+    ]
     await loadPrescriptions()
   } catch (error) {
-    ElMessage.error(getErrorMessage(error, '创建处方失败'))
+    ElMessage.error(getPrescriptionSubmitErrorMessage(error))
   } finally {
     submitting.value = false
   }
@@ -440,23 +638,6 @@ async function doCancelInspection(id) {
   }
 }
 
-async function doDispense() {
-  submitting.value = true
-
-  try {
-    const response = await dispensePrescription({
-      prescriptionId: Number(dispenseForm.prescriptionId),
-      pharmacyUserId: Number(dispenseForm.pharmacyUserId)
-    })
-    ElMessage.success(`发药成功，记录 ID：${unwrapResult(response, '发药失败')}`)
-    await loadPrescriptions()
-  } catch (error) {
-    ElMessage.error(getErrorMessage(error, '发药失败'))
-  } finally {
-    submitting.value = false
-  }
-}
-
 async function lookupCheckResult() {
   if (!checkResultLookupId.value) {
     return
@@ -538,7 +719,6 @@ function addPrescriptionItem() {
     dosage: '',
     frequency: '',
     days: 1,
-    quantity: 1,
     usageMethod: ''
   })
 }
@@ -548,6 +728,14 @@ function removePrescriptionItem(index) {
     return
   }
   prescriptionForm.items.splice(index, 1)
+}
+
+function findDrugOption(drugId) {
+  if (!drugId) {
+    return null
+  }
+
+  return drugs.value.find((drug) => String(drug.id) === String(drugId)) || null
 }
 
 function addInspectionResultItem() {
@@ -569,6 +757,11 @@ function removeInspectionResultItem(index) {
 }
 
 function resolveOrderSection() {
+  const queryTab = typeof route.query.tab === 'string' ? route.query.tab : ''
+  if (queryTab === 'check' || queryTab === 'inspection' || queryTab === 'prescription') {
+    return queryTab
+  }
+
   const section = route.meta?.orderSection
   if (section === 'inspection' || section === 'prescription') {
     return section
@@ -603,7 +796,7 @@ watch(
     <article class="glass-card panel-card">
       <div class="status-chip">Clinical Orders</div>
       <h2 class="section-title">检查、检验与处方</h2>
-      <p class="section-desc">当前页直接对接后端已实现的检查申请、检验申请、处方、发药、检查结果与检验结果接口。</p>
+      <p class="section-desc">当前页直接对接后端已实现的检查申请、检验申请、处方、检查结果与检验结果接口；发药已独立到药房工作区。</p>
 
       <el-alert
         v-if="isPreview"
@@ -616,7 +809,7 @@ watch(
 
       <el-alert
         v-else-if="!doctorId"
-        title="当前登录信息里没有 doctor bizId，暂时无法执行医生业务操作"
+        title="当前登录信息里没有医生业务 ID，暂时无法执行医生业务操作"
         type="warning"
         :closable="false"
         show-icon
@@ -632,18 +825,42 @@ watch(
         class="notice"
       />
 
+      <div v-if="canReturnToConsultation" class="page-toolbar">
+        <el-button round @click="goBackToConsultation">返回当前接诊</el-button>
+        <span class="toolbar-tip">开单完成后可回到接诊页继续做 CT 分析、处方和结束就诊。</span>
+      </div>
+
       <el-tabs v-if="!isPreview && doctorId" v-model="activeTab" class="tabs-block">
         <el-tab-pane label="检查申请" name="check">
           <div class="section-grid">
             <article class="sub-card">
               <h3>创建检查申请</h3>
-              <p class="form-tip">病人、挂号、病历和申请科室信息会根据当前接诊对象自动带入，无需手动填写。</p>
+              <p class="form-tip">病人、挂号、病历和申请科室信息会根据当前接诊对象自动带入，这里只需要选择检查项目。</p>
               <div class="form-grid">
-                <el-input v-model="checkForm.targetDepartmentId" placeholder="targetDepartmentId" />
-                <el-input v-model="checkForm.checkItemCode" placeholder="checkItemCode" />
-                <el-input v-model="checkForm.checkItemName" placeholder="checkItemName" />
-                <el-input v-model="checkForm.clinicalDiagnosis" placeholder="clinicalDiagnosis" />
-                <el-input v-model="checkForm.purpose" placeholder="purpose" />
+                <el-select
+                  v-model="checkForm.checkItemCode"
+                  placeholder="选择检查项目"
+                  filterable
+                  @change="handleCheckItemChange"
+                >
+                  <el-option
+                    v-for="item in CHECK_ITEM_OPTIONS"
+                    :key="item.code"
+                    :label="`${item.name} / ${item.code}`"
+                    :value="item.code"
+                  />
+                </el-select>
+                <el-input v-model="checkForm.checkItemName" placeholder="项目名称" readonly />
+                <el-select v-model="checkForm.targetDepartmentId" placeholder="选择执行科室">
+                  <el-option
+                    v-for="dept in DEPARTMENT_OPTIONS"
+                    :key="dept.value"
+                    :label="dept.label"
+                    :value="dept.value"
+                  />
+                </el-select>
+                <el-input v-model="checkForm.clinicalDiagnosis" placeholder="临床诊断" />
+                <el-input v-model="checkForm.purpose" placeholder="检查目的" />
                 <el-switch v-model="checkForm.urgentFlag" active-text="加急" />
               </div>
               <el-button type="primary" round :loading="submitting" @click="submitCheckRequest">提交检查申请</el-button>
@@ -734,12 +951,31 @@ watch(
           <div class="section-grid">
             <article class="sub-card">
               <h3>创建检验申请</h3>
-              <p class="form-tip">病人、挂号、病历和申请科室信息会根据当前接诊对象自动带入，无需手动填写。</p>
+              <p class="form-tip">病人、挂号、病历和申请科室信息会根据当前接诊对象自动带入，这里只需要选择检验项目。</p>
               <div class="form-grid">
-                <el-input v-model="inspectionForm.targetDepartmentId" placeholder="targetDepartmentId" />
-                <el-input v-model="inspectionForm.inspectionItemCode" placeholder="inspectionItemCode" />
-                <el-input v-model="inspectionForm.inspectionItemName" placeholder="inspectionItemName" />
-                <el-input v-model="inspectionForm.sampleType" placeholder="sampleType" />
+                <el-select
+                  v-model="inspectionForm.inspectionItemCode"
+                  placeholder="选择检验项目"
+                  filterable
+                  @change="handleInspectionItemChange"
+                >
+                  <el-option
+                    v-for="item in INSPECTION_ITEM_OPTIONS"
+                    :key="item.code"
+                    :label="`${item.name} / ${item.code}`"
+                    :value="item.code"
+                  />
+                </el-select>
+                <el-input v-model="inspectionForm.inspectionItemName" placeholder="项目名称" readonly />
+                <el-select v-model="inspectionForm.targetDepartmentId" placeholder="选择执行科室">
+                  <el-option
+                    v-for="dept in DEPARTMENT_OPTIONS"
+                    :key="dept.value"
+                    :label="dept.label"
+                    :value="dept.value"
+                  />
+                </el-select>
+                <el-input v-model="inspectionForm.sampleType" placeholder="样本类型" readonly />
                 <el-switch v-model="inspectionForm.urgentFlag" active-text="加急" />
               </div>
               <el-button type="primary" round :loading="submitting" @click="submitInspectionRequest">提交检验申请</el-button>
@@ -850,26 +1086,37 @@ watch(
           </div>
         </el-tab-pane>
 
-        <el-tab-pane label="处方与发药" name="prescription">
-          <div v-if="route.query.source === 'record'" class="context-bar">
-            <span>patientId: {{ prescriptionForm.patientId || '--' }}</span>
-            <span>registrationId: {{ prescriptionForm.registrationId || '--' }}</span>
-            <span>medicalRecordId: {{ prescriptionForm.medicalRecordId || '--' }}</span>
-            <span>departmentId: {{ prescriptionForm.departmentId || '--' }}</span>
+        <el-tab-pane label="处方开立" name="prescription">
+          <div v-if="route.query.source === 'record' && canFinishVisitFromPrescription" class="prescription-toolbar">
+            <el-button
+              type="success"
+              round
+              :loading="finishingVisit"
+              @click="finishVisitFromPrescription"
+            >
+              处方完成并结束接诊
+            </el-button>
           </div>
+
           <div class="section-grid">
             <article class="sub-card">
               <div class="sub-head">
-                <h3>创建处方</h3>
+                <h3>手动开处方</h3>
                 <el-button text type="primary" @click="addPrescriptionItem">新增药品项</el-button>
               </div>
+              <p class="form-tip">病历页会自动带入患者、挂号、病历和科室信息。这里选择药品并填写剂量、频次、天数、用法；数量会按“频次 x 天数”自动计算。</p>
               <div class="form-grid">
-                <el-input v-model="prescriptionForm.patientId" placeholder="patientId" />
-                <el-input v-model="prescriptionForm.registrationId" placeholder="registrationId" />
-                <el-input v-model="prescriptionForm.medicalRecordId" placeholder="medicalRecordId" />
-                <el-input v-model="prescriptionForm.departmentId" placeholder="departmentId" />
-                <el-input v-model="prescriptionForm.remark" placeholder="remark" />
+                <el-select v-model="prescriptionForm.prescriptionType" placeholder="处方类型">
+                  <el-option label="西药处方" value="WESTERN" />
+                  <el-option label="中药处方" value="CHINESE" />
+                </el-select>
               </div>
+              <el-input
+                v-model="prescriptionForm.remark"
+                type="textarea"
+                :rows="3"
+                placeholder="处方备注，例如：饭后服用、观察不适反应"
+              />
 
               <div
                 v-for="(item, index) in prescriptionForm.items"
@@ -880,20 +1127,44 @@ watch(
                   <strong>药品项 {{ index + 1 }}</strong>
                   <el-button text @click="removePrescriptionItem(index)">删除</el-button>
                 </div>
-                <div class="form-grid">
-                  <el-select v-model="item.drugId" placeholder="选择药品" filterable :loading="loadingDrugs">
-                    <el-option
-                      v-for="drug in drugs"
-                      :key="drug.id"
-                      :label="`${drug.drugName} / 库存 ${drug.stockQuantity}`"
-                      :value="drug.id"
-                    />
-                  </el-select>
-                  <el-input v-model="item.dosage" placeholder="dosage" />
-                  <el-input v-model="item.frequency" placeholder="frequency" />
-                  <el-input-number v-model="item.days" :min="1" />
-                  <el-input-number v-model="item.quantity" :min="1" />
-                  <el-input v-model="item.usageMethod" placeholder="usageMethod" />
+                <div class="form-grid labeled-grid">
+                  <div class="field-block">
+                    <label>药品</label>
+                    <el-select v-model="item.drugId" placeholder="选择药品" filterable :loading="loadingDrugs">
+                      <el-option
+                        v-for="drug in drugs"
+                        :key="drug.id"
+                        :label="`${drug.drugName} / ${drug.specification || '规格待补充'} / 库存 ${drug.stockQuantity ?? '--'}`"
+                        :value="drug.id"
+                      />
+                    </el-select>
+                  </div>
+                  <div class="field-block">
+                    <label>剂量</label>
+                    <el-input v-model="item.dosage" placeholder="例如 0.5g" />
+                  </div>
+                  <div class="field-block">
+                    <label>频次</label>
+                    <el-input v-model="item.frequency" placeholder="例如 每日3次、bid、tid、qid" />
+                  </div>
+                  <div class="field-block">
+                    <label>天数</label>
+                    <el-input-number v-model="item.days" :min="1" />
+                  </div>
+                  <div class="field-block">
+                    <label>数量（自动计算）</label>
+                    <el-input :model-value="calculatePrescriptionQuantity(item) ?? '请先填写可识别的频次'" readonly />
+                  </div>
+                  <div class="field-block">
+                    <label>用法</label>
+                    <el-input v-model="item.usageMethod" placeholder="例如 口服" />
+                  </div>
+                </div>
+                <div v-if="findDrugOption(item.drugId)" class="drug-meta">
+                  <span>药品名称：{{ findDrugOption(item.drugId)?.drugName || '--' }}</span>
+                  <span>规格：{{ findDrugOption(item.drugId)?.specification || '--' }}</span>
+                  <span>单价：{{ findDrugOption(item.drugId)?.salePrice ?? '--' }}</span>
+                  <span>当前库存：{{ findDrugOption(item.drugId)?.stockQuantity ?? '--' }}</span>
                 </div>
               </div>
 
@@ -939,14 +1210,6 @@ watch(
             <el-table-column prop="amount" label="金额" min-width="100" />
           </el-table>
 
-          <article class="sub-card dispense-card">
-            <h3>发药操作</h3>
-            <div class="lookup-row">
-              <el-input v-model="dispenseForm.prescriptionId" placeholder="prescriptionId" />
-              <el-input v-model="dispenseForm.pharmacyUserId" placeholder="pharmacyUserId" />
-              <el-button type="primary" round :loading="submitting" @click="doDispense">执行发药</el-button>
-            </div>
-          </article>
         </el-tab-pane>
       </el-tabs>
     </article>
@@ -960,8 +1223,27 @@ watch(
 }
 
 .notice,
+.page-toolbar,
 .tabs-block,
 .detail-board {
+  margin-top: 20px;
+}
+
+.page-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.toolbar-tip {
+  color: var(--text-secondary);
+}
+
+.prescription-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
   margin-top: 20px;
 }
 
@@ -1025,6 +1307,21 @@ watch(
   margin-bottom: 16px;
 }
 
+.labeled-grid {
+  align-items: start;
+}
+
+.field-block {
+  display: grid;
+  gap: 8px;
+}
+
+.field-block label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
 .dynamic-card {
   margin-bottom: 16px;
   padding: 16px;
@@ -1032,10 +1329,18 @@ watch(
   background: rgba(255, 255, 255, 0.72);
 }
 
+.drug-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
 .table-block,
 .list-footer,
-.mini-detail,
-.dispense-card {
+.mini-detail {
   margin-top: 16px;
 }
 

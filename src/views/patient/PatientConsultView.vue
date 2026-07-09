@@ -64,8 +64,8 @@ function extractStructuredBlocks(content = '') {
     try {
       const parsed = JSON.parse(jsonText)
       blocks.push(parsed)
-    } catch (error) {
-      console.warn('[PatientConsultView] failed to parse JSON block:', error)
+    } catch {
+      // Ignore malformed structured blocks and keep the original assistant text.
     }
 
     return ''
@@ -176,8 +176,6 @@ async function sendMessage(content) {
   try {
     const response = await sendChatMessage(sessionInfo.value.sessionNo, { content })
     const assistantReply = unwrapResult(response, '发送消息失败') || ''
-    console.log('[AI Chat] backend response:', response)
-    console.log('[AI Chat] assistant reply:', assistantReply)
     pushAssistantMessage(assistantReply)
     messageForm.content = ''
     await scrollMessagesToBottom()

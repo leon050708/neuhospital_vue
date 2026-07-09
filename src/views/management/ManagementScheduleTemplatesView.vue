@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRoute } from 'vue-router'
 
@@ -211,8 +211,20 @@ async function loadTemplates() {
   }
 }
 
+function resetQuery() {
+  query.pageNo = 1
+  query.pageSize = 10
+  query.departmentId = ''
+  query.doctorId = ''
+}
+
 function handleDepartmentFilterChange() {
   query.doctorId = ''
+  query.pageNo = 1
+  loadTemplates()
+}
+
+function handleDoctorFilterChange() {
   query.pageNo = 1
   loadTemplates()
 }
@@ -349,10 +361,19 @@ async function submitGenerate() {
   }
 }
 
-onMounted(async () => {
-  await Promise.all([loadDepartments(), loadDoctors()])
-  await loadTemplates()
-})
+watch(
+  () => route.fullPath,
+  async (path) => {
+    if (isPreview.value || !path.includes('/management/schedules/templates')) {
+      return
+    }
+
+    resetQuery()
+    await Promise.all([loadDepartments(), loadDoctors()])
+    await loadTemplates()
+  },
+  { immediate: true }
+)
 </script>
 
 <template>
@@ -389,7 +410,7 @@ onMounted(async () => {
           />
         </el-select>
 
-        <el-select v-model="query.doctorId" placeholder="筛选医生" clearable @change="loadTemplates">
+        <el-select v-model="query.doctorId" placeholder="筛选医生" clearable @change="handleDoctorFilterChange">
           <el-option
             v-for="item in filterDoctorsByDepartment(query.departmentId)"
             :key="item.id"

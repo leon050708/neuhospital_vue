@@ -10,6 +10,12 @@ export default defineConfig(({ command }) => ({
     vue(),
     command === 'serve' ? vueDevTools() : null
   ].filter(Boolean),
+  define: {
+    process: {
+      env: {},
+      stderr: null
+    }
+  },
   server: {
     proxy: {
       '/api': {
@@ -20,7 +26,8 @@ export default defineConfig(({ command }) => ({
   },
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url))
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      assert: 'assert'
     }
   }
 }))

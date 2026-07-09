@@ -19,6 +19,11 @@ const loading = ref(false)
 const actionLoading = ref(false)
 const queueList = ref([])
 const ACTIVE_QUEUE_STATUSES = ['WAITING', 'CALLED', 'SKIPPED']
+const ENTERABLE_QUEUE_STATUSES = ['WAITING', 'CALLED']
+
+function getQueueRowId(row) {
+  return row?.id || row?.queueId || row?.queue_id || ''
+}
 
 function getPatientDisplayName(row) {
   return row?.patientName || row?.realName || row?.patientRealName || `患者#${row?.patientId || '--'}`
@@ -113,8 +118,25 @@ async function runQueueAction(action, id, successText) {
   }
 }
 
+function markRowAsCalled(row) {
+  const rowId = getQueueRowId(row)
+  const matchedRow = queueList.value.find((item) => getQueueRowId(item) === rowId)
+  if (!matchedRow) {
+    return
+  }
+
+  matchedRow.queueStatus = 'CALLED'
+  row.queueStatus = 'CALLED'
+  if (!matchedRow.calledAt) {
+    matchedRow.calledAt = new Date().toISOString().slice(0, 19).replace('T', ' ')
+  }
+  if (!row.calledAt) {
+    row.calledAt = matchedRow.calledAt
+  }
+}
+
 function canEnterConsultation(row) {
-  return ACTIVE_QUEUE_STATUSES.includes(row?.queueStatus)
+  return ENTERABLE_QUEUE_STATUSES.includes(row?.queueStatus)
 }
 
 function enterConsultation(row) {
@@ -123,28 +145,43 @@ function enterConsultation(row) {
     return
   }
 
-  const path = route.meta?.preview ? '/preview/doctor/records' : '/workspace/doctor/records'
-
   router.push({
-    path,
+    path: '/workspace/doctor/records/consultation',
     query: {
       source: 'queue',
-      queueId: row.id || '',
+      queueId: getQueueRowId(row),
       queueNo: row.queueNo || '',
       registrationId: row.registrationId || '',
       registrationNo: row.registrationNo || '',
       patientId: row.patientId || '',
       departmentId: row.departmentId || ''
     }
+  }).catch((error) => {
+    ElMessage.error(error?.message || '进入接诊失败')
   })
 }
 
-async function handleCallAndEnter(row) {
-  if (row.queueStatus !== 'CALLED') {
-    await runQueueAction(callQueuePatient, row.id, '叫号成功')
+async function handlePrimaryAction(row) {
+  if (row.queueStatus === 'CALLED') {
+    enterConsultation(row)
+    return
   }
 
-  enterConsultation(row)
+  actionLoading.value = true
+
+  try {
+    const response = await callQueuePatient(getQueueRowId(row), doctorId.value)
+    if (response.code && response.code !== 200) {
+      throw new Error(response.message || '叫号失败')
+    }
+
+    markRowAsCalled(row)
+    ElMessage.success('叫号成功，当前按钮已切换为“进入接诊”')
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || error.message || '叫号失败')
+  } finally {
+    actionLoading.value = false
+  }
 }
 
 onMounted(loadQueue)
@@ -217,10 +254,10 @@ onMounted(loadQueue)
           <el-table-column label="操作" min-width="240" fixed="right">
             <template #default="{ row }">
               <div class="row-actions">
-                <el-button link type="primary" :loading="actionLoading" @click="handleCallAndEnter(row)">
+                <el-button link type="primary" :loading="actionLoading" @click="handlePrimaryAction(row)">
                   {{ row.queueStatus === 'CALLED' ? '进入接诊' : '叫号接诊' }}
                 </el-button>
-                <el-button link :loading="actionLoading" @click="runQueueAction(skipQueuePatient, row.id, '过号成功')">
+                <el-button link :loading="actionLoading" @click="runQueueAction(skipQueuePatient, getQueueRowId(row), '过号成功')">
                   过号
                 </el-button>
               </div>

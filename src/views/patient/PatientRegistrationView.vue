@@ -113,10 +113,6 @@ function normalizeSchedule(item) {
     item.totalNum
   )
 
-  if (import.meta.env.DEV && availableCount === null) {
-    console.warn('[PatientRegistrationView] schedule missing available count field:', item)
-  }
-
   return {
     ...item,
     availableCount,

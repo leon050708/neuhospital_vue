@@ -16,6 +16,10 @@ const fallbackPath = computed(() => {
     return '/workspace/doctor/queue'
   }
 
+  if (authStore.userType === 'PHARMACIST' || authStore.userType === 'PHARMACY') {
+    return '/workspace/pharmacy/drugs'
+  }
+
   if (authStore.userType === 'MANAGEMENT' || authStore.userType === 'ADMIN') {
     return '/workspace/management/departments'
   }

@@ -81,7 +81,8 @@ function isToday(value) {
     return false
   }
 
-  const today = new Date().toISOString().slice(0, 10)
+  const now = new Date()
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   return String(value).slice(0, 10) === today
 }
 
@@ -89,8 +90,19 @@ function canCancelRegistration(row) {
   return ['UNPAID', 'PAID', 'PENDING'].includes(row?.status)
 }
 
+function getRegistrationVisitDate(row) {
+  return row?.visitDate || row?.visit_date || row?.appointmentDate || row?.scheduleDate || row?.registeredAt || row?.createdAt || ''
+}
+
 function canCheckInRegistration(row) {
-  return row?.status === 'PAID' && isToday(row?.visitDate)
+  return row?.status === 'PAID' && isToday(getRegistrationVisitDate(row))
+}
+
+function getPreferredRegistration(records = registrations.value) {
+  return records.find((item) => canCheckInRegistration(item))
+    || records.find((item) => item?.status === 'PAID')
+    || records[0]
+    || null
 }
 
 function resolveOrderSection() {
@@ -114,6 +126,14 @@ async function loadRegistrations() {
     const pageData = unwrapResult(response, '加载我的挂号失败') || {}
     registrations.value = (pageData.records || []).filter((item) => item.status !== 'CANCELLED')
     registrationTotal.value = registrations.value.length
+
+    const routeRegistrationId = typeof route.query.registrationId === 'string' ? route.query.registrationId : ''
+    if (!routeRegistrationId && !selectedRegistration.value) {
+      const preferred = getPreferredRegistration(registrations.value)
+      if (preferred?.id) {
+        selectedRegistration.value = preferred
+      }
+    }
   } catch (error) {
     ElMessage.error(error.response?.data?.message || '加载我的挂号失败')
   } finally {
@@ -152,9 +172,8 @@ async function viewRegistrationDetail(id) {
 }
 
 function openRegistrationDetail(id) {
-  const basePath = route.meta?.preview ? '/preview/patient/orders/registrations' : '/workspace/patient/orders/registrations'
   router.push({
-    path: basePath,
+    path: '/workspace/patient/orders/registrations',
     query: {
       ...route.query,
       registrationId: id
@@ -201,6 +220,7 @@ async function handlePay(row) {
   actionLoading.value = true
 
   try {
+    const relatedRegistrationId = getPaymentRegistration(row)?.id || row?.bizId
     const createResponse = await createPaymentOrder({
       items: [
         {
@@ -218,6 +238,27 @@ async function handlePay(row) {
 
     ElMessage.success(payResponse.message || '模拟支付成功')
     await Promise.all([loadPendingPayments(), loadRegistrations()])
+
+    router.push({
+      path: '/workspace/patient/orders/registrations',
+      query: relatedRegistrationId
+        ? {
+            ...route.query,
+            registrationId: relatedRegistrationId
+          }
+        : {
+            ...route.query
+          }
+    })
+
+    if (relatedRegistrationId) {
+      await viewRegistrationDetail(relatedRegistrationId)
+    } else {
+      const preferred = getPreferredRegistration()
+      if (preferred?.id) {
+        await viewRegistrationDetail(preferred.id)
+      }
+    }
   } catch (error) {
     ElMessage.error(error.response?.data?.message || error.message || '模拟支付失败')
   } finally {
@@ -259,6 +300,15 @@ watch(
       <div class="status-chip">Registration & Payment</div>
       <h2 class="section-title">我的挂号与支付中心</h2>
       <p class="section-desc">这里直接对应后端已实现的“我的挂号、挂号详情、退号、签到、待支付、创建支付单、模拟支付”流程。</p>
+
+      <el-alert
+        v-if="!isPreview && patientId"
+        title="当前流程是：先挂号，未缴费不会进医生待诊；缴费成功后，还需要在就诊当天点一次“签到”，系统才会创建候诊队列，医生端才能看到你。"
+        type="info"
+        :closable="false"
+        show-icon
+        class="notice"
+      />
 
       <el-alert
         v-if="isPreview"
@@ -317,11 +367,13 @@ watch(
                   </el-button>
                   <el-button
                     v-if="canCheckInRegistration(row)"
-                    link
+                    type="primary"
+                    round
+                    size="small"
                     :loading="actionLoading"
                     @click="handleCheckIn(row.id)"
                   >
-                    签到
+                    立即签到
                   </el-button>
                 </div>
               </template>
@@ -347,6 +399,25 @@ watch(
             <el-descriptions-item label="挂号时间">{{ selectedRegistration.registeredAt || '--' }}</el-descriptions-item>
             <el-descriptions-item label="费用">{{ selectedRegistration.feeAmount || '--' }}</el-descriptions-item>
           </el-descriptions>
+
+          <div
+            v-if="selectedRegistration && canCheckInRegistration(selectedRegistration)"
+            class="checkin-banner"
+          >
+            <div>
+              <strong>当前挂号已满足签到条件</strong>
+              <p>就诊当天、且已缴费的挂号，需要先签到后才会进入医生待接诊队列。</p>
+            </div>
+            <el-button
+              type="primary"
+              round
+              size="large"
+              :loading="actionLoading"
+              @click="handleCheckIn(selectedRegistration.id)"
+            >
+              立即签到进入候诊
+            </el-button>
+          </div>
         </el-tab-pane>
 
         <el-tab-pane label="待支付项目" name="payments">
@@ -417,8 +488,38 @@ watch(
   gap: 10px;
 }
 
+.checkin-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 20px;
+  padding: 18px 20px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, rgba(121, 189, 224, 0.16), rgba(111, 200, 184, 0.18));
+  border: 1px solid rgba(121, 189, 224, 0.22);
+}
+
+.checkin-banner strong {
+  display: block;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.checkin-banner p {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+}
+
 .list-footer {
   color: var(--text-secondary);
+}
+
+@media (max-width: 900px) {
+  .checkin-banner {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
 .tabs-block :deep(.el-tabs__header) {

@@ -7,3 +7,27 @@ export function getDrugPage(params) {
     params
   })
 }
+
+export function createDrug(data) {
+  return request({
+    url: '/drugs',
+    method: 'post',
+    data
+  })
+}
+
+export function updateDrug(id, data) {
+  return request({
+    url: `/drugs/${id}`,
+    method: 'put',
+    data
+  })
+}
+
+export function adjustDrugStock(id, data) {
+  return request({
+    url: `/drugs/${id}/stock-adjust`,
+    method: 'post',
+    data
+  })
+}

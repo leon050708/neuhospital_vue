@@ -2,6 +2,45 @@ const ACCESS_TOKEN_KEY = 'neu_hospital_access_token'
 const REFRESH_TOKEN_KEY = 'neu_hospital_refresh_token'
 const PROFILE_KEY = 'neu_hospital_profile'
 
+export function normalizeUserType(userType) {
+  if (userType === 'PHARMACIST') {
+    return 'PHARMACY'
+  }
+
+  return userType || ''
+}
+
+export function normalizeRole(role, userType = '') {
+  if (role === 'PHARMACIST') {
+    return 'PHARMACY'
+  }
+
+  if (!role && userType === 'PHARMACIST') {
+    return 'PHARMACY'
+  }
+
+  return role || ''
+}
+
+export function buildAuthIdentityHeaders(profile) {
+  if (!profile) {
+    return {}
+  }
+
+  const normalizedUserType = normalizeUserType(profile.userType)
+  const normalizedRole = normalizeRole(profile.role, profile.userType)
+  const resolvedUserId = profile.userId ?? ''
+  const resolvedUsername = profile.username ?? ''
+  const roles = Array.from(new Set([profile.role, normalizedRole].filter(Boolean))).join(',')
+
+  return {
+    ...(resolvedUserId ? { 'X-User-Id': String(resolvedUserId) } : {}),
+    ...(resolvedUsername ? { 'X-Username': String(resolvedUsername) } : {}),
+    ...(normalizedUserType ? { 'X-User-Type': normalizedUserType } : {}),
+    ...(roles ? { 'X-User-Roles': roles } : {})
+  }
+}
+
 export function getAccessToken() {
   return localStorage.getItem(ACCESS_TOKEN_KEY) || ''
 }

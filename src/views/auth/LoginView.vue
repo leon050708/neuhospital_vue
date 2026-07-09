@@ -79,12 +79,17 @@ const roleCards = [
   {
     label: '医生端',
     title: '候诊、病历、检查、CT 分析',
-    desc: '当前已接候诊队列、病历查询、检查/检验申请、处方发药和 CT 智能分析。'
+    desc: '当前已接候诊队列、病历查询、检查/检验申请、处方开立和 CT 智能分析。'
+  },
+  {
+    label: '药房端',
+    title: '药品、库存、发药',
+    desc: '当前已接药品信息维护、库存调整、待发药处方和发药记录查询。'
   },
   {
     label: '管理端',
     title: '科室、排班、患者、资产查询',
-    desc: '当前已接科室、医生、排班、患者、药品库存和文件记录查询。'
+    desc: '当前已接科室、医生、排班、患者、文件记录和知识库上传。'
   }
 ]
 
@@ -95,6 +100,10 @@ function resolveHomeByUserType(userType) {
 
   if (userType === 'DOCTOR') {
     return '/workspace/doctor/queue'
+  }
+
+  if (userType === 'PHARMACIST' || userType === 'PHARMACY') {
+    return '/workspace/pharmacy/drugs'
   }
 
   if (userType === 'MANAGEMENT' || userType === 'ADMIN') {
@@ -180,8 +189,8 @@ async function handleRegister() {
         <div class="hud-label">Smart Medical Portal</div>
         <h1>智慧云脑诊疗平台</h1>
         <p>
-          当前前端按患者端、医生端、管理端三类身份组织，并已经对齐现有后端接口。
-          患者支持注册，医生和管理员使用已有账号登录，登录后会根据 `userType` 自动进入对应工作区。
+          平台按患者端、医生端、药房端、管理端四类身份组织。
+          患者支持注册，医生、药房人员和管理员使用已有账号登录，登录后会根据 `userType` 自动进入对应工作区。
         </p>
       </div>
 
@@ -203,7 +212,7 @@ async function handleRegister() {
         <p>
           {{
             activePanel === 'login'
-              ? '患者使用手机号登录，医生和管理员使用系统分配账号登录。'
+              ? '患者使用手机号登录，医生、药房人员和管理员使用系统分配账号登录。'
               : '当前仅开放患者注册，注册完成后手机号将直接作为登录账号。'
           }}
         </p>

@@ -3,10 +3,13 @@ import { defineStore } from 'pinia'
 
 import { login as loginApi, logout as logoutApi, getCurrentUser, register as registerApi } from '@/api/auth'
 import {
+  buildAuthIdentityHeaders,
   clearAuthStorage,
   getAccessToken,
   getRefreshToken,
   getUserProfile,
+  normalizeRole,
+  normalizeUserType,
   setAuthStorage
 } from '@/utils/auth'
 import { unwrapResult } from '@/utils/result'
@@ -32,8 +35,8 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function applyAuthPayload(payload) {
-    const resolvedUserType = payload.userType || payload.role || ''
-    const resolvedRole = payload.role || payload.userType || ''
+    const resolvedUserType = normalizeUserType(payload.userType || payload.role || '')
+    const resolvedRole = normalizeRole(payload.role || payload.userType || '', resolvedUserType)
 
     accessToken.value = payload.accessToken || accessToken.value || ''
     refreshToken.value = payload.refreshToken || refreshToken.value || ''
@@ -79,8 +82,8 @@ export const useAuthStore = defineStore('auth', () => {
     const payload = unwrapResult(response, '加载当前用户失败')
     profile.value = {
       ...payload,
-      userType: payload.userType || payload.role || '',
-      role: payload.role || payload.userType || ''
+      userType: normalizeUserType(payload.userType || payload.role || ''),
+      role: normalizeRole(payload.role || payload.userType || '', payload.userType || payload.role || '')
     }
     profileLoaded.value = true
 
@@ -136,6 +139,7 @@ export const useAuthStore = defineStore('auth', () => {
     ensureProfile,
     logout,
     updateAccessToken,
-    clearAuth
+    clearAuth,
+    buildAuthIdentityHeaders
   }
 })

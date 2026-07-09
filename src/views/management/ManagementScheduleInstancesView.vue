@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRoute } from 'vue-router'
 
@@ -181,8 +181,32 @@ async function loadSchedules() {
   }
 }
 
+function resetQuery() {
+  query.pageNo = 1
+  query.pageSize = 10
+  query.departmentId = ''
+  query.doctorId = ''
+  query.scheduleDate = ''
+  query.timeSlot = ''
+}
+
 function handleDepartmentFilterChange() {
   query.doctorId = ''
+  query.pageNo = 1
+  loadSchedules()
+}
+
+function handleDoctorFilterChange() {
+  query.pageNo = 1
+  loadSchedules()
+}
+
+function handleScheduleDateChange() {
+  query.pageNo = 1
+  loadSchedules()
+}
+
+function handleTimeSlotChange() {
   query.pageNo = 1
   loadSchedules()
 }
@@ -290,10 +314,19 @@ async function handleClose(row) {
   }
 }
 
-onMounted(async () => {
-  await Promise.all([loadDepartments(), loadDoctors()])
-  await loadSchedules()
-})
+watch(
+  () => route.fullPath,
+  async (path) => {
+    if (isPreview.value || !path.includes('/management/schedules/instances')) {
+      return
+    }
+
+    resetQuery()
+    await Promise.all([loadDepartments(), loadDoctors()])
+    await loadSchedules()
+  },
+  { immediate: true }
+)
 </script>
 
 <template>
@@ -329,7 +362,7 @@ onMounted(async () => {
           />
         </el-select>
 
-        <el-select v-model="query.doctorId" placeholder="筛选医生" clearable @change="loadSchedules">
+        <el-select v-model="query.doctorId" placeholder="筛选医生" clearable @change="handleDoctorFilterChange">
           <el-option
             v-for="item in filterDoctorsByDepartment(query.departmentId)"
             :key="item.id"
@@ -344,10 +377,10 @@ onMounted(async () => {
           value-format="YYYY-MM-DD"
           placeholder="选择排班日期"
           clearable
-          @change="loadSchedules"
+          @change="handleScheduleDateChange"
         />
 
-        <el-select v-model="query.timeSlot" placeholder="筛选时段" clearable @change="loadSchedules">
+        <el-select v-model="query.timeSlot" placeholder="筛选时段" clearable @change="handleTimeSlotChange">
           <el-option
             v-for="item in timeSlotOptions"
             :key="item.value"

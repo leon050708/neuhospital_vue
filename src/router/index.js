@@ -1,6 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
+function isPharmacyUserType(userType) {
+  return userType === 'PHARMACIST' || userType === 'PHARMACY'
+}
+
 function resolveWorkspaceDefaultPath(userType) {
   if (userType === 'PATIENT') {
     return '/workspace/patient/profile'
@@ -8,6 +12,10 @@ function resolveWorkspaceDefaultPath(userType) {
 
   if (userType === 'DOCTOR') {
     return '/workspace/doctor/queue'
+  }
+
+  if (isPharmacyUserType(userType)) {
+    return '/workspace/pharmacy/drugs'
   }
 
   if (userType === 'MANAGEMENT' || userType === 'ADMIN') {
@@ -249,7 +257,7 @@ const routes = [
             meta: {
               requiresAuth: true,
               userTypes: ['DOCTOR'],
-              title: '处方发药',
+              title: '处方开立',
               orderSection: 'prescription'
             }
           }
@@ -350,6 +358,44 @@ const routes = [
         }
       },
       {
+        path: 'pharmacy',
+        name: 'pharmacy',
+        component: () => import('@/views/common/WorkspaceSectionOutlet.vue'),
+        meta: {
+          requiresAuth: true,
+          userTypes: ['PHARMACIST', 'PHARMACY'],
+          title: '药房工作台'
+        },
+        children: [
+          {
+            path: '',
+            redirect: '/workspace/pharmacy/drugs'
+          },
+          {
+            path: 'drugs',
+            name: 'pharmacy-drugs',
+            component: () => import('@/views/pharmacy/PharmacyWorkspaceView.vue'),
+            meta: {
+              requiresAuth: true,
+              userTypes: ['PHARMACIST', 'PHARMACY'],
+              title: '药品管理',
+              section: 'drugs'
+            }
+          },
+          {
+            path: 'dispense',
+            name: 'pharmacy-dispense',
+            component: () => import('@/views/pharmacy/PharmacyWorkspaceView.vue'),
+            meta: {
+              requiresAuth: true,
+              userTypes: ['PHARMACIST', 'PHARMACY'],
+              title: '发药工作台',
+              section: 'dispense'
+            }
+          }
+        ]
+      },
+      {
         path: 'management/assets',
         name: 'management-assets',
         component: () => import('@/views/common/WorkspaceSectionOutlet.vue'),
@@ -361,18 +407,7 @@ const routes = [
         children: [
           {
             path: '',
-            redirect: '/workspace/management/assets/drugs'
-          },
-          {
-            path: 'drugs',
-            name: 'management-assets-drugs',
-            component: () => import('@/views/management/ManagementAssetsView.vue'),
-            meta: {
-              requiresAuth: true,
-              userTypes: ['MANAGEMENT', 'ADMIN'],
-              title: '药品库存',
-              section: 'drugs'
-            }
+            redirect: '/workspace/management/assets/files'
           },
           {
             path: 'files',
@@ -393,366 +428,6 @@ const routes = [
               requiresAuth: true,
               userTypes: ['MANAGEMENT', 'ADMIN'],
               title: '知识库上传',
-              section: 'knowledge'
-            }
-          }
-        ]
-      }
-    ]
-  },
-  {
-    path: '/preview',
-    component: () => import('@/layout/PortalLayout.vue'),
-    meta: {
-      preview: true,
-      title: '三端预览'
-    },
-    children: [
-      {
-        path: '',
-        redirect: '/preview/patient/profile'
-      },
-      {
-        path: 'patient/profile',
-        name: 'preview-patient-profile',
-        component: () => import('@/views/patient/PatientProfileView.vue'),
-        meta: {
-          preview: true,
-          previewUserType: 'PATIENT',
-          title: '患者档案预览'
-        }
-      },
-      {
-        path: 'patient/records',
-        name: 'preview-patient-records',
-        component: () => import('@/views/common/WorkspaceSectionOutlet.vue'),
-        meta: {
-          preview: true,
-          previewUserType: 'PATIENT',
-          title: '我的病例预览'
-        },
-        children: [
-          {
-            path: '',
-            redirect: '/preview/patient/records/list'
-          },
-          {
-            path: 'list',
-            name: 'preview-patient-records-list',
-            component: () => import('@/views/patient/PatientRecordsView.vue'),
-            meta: {
-              preview: true,
-              previewUserType: 'PATIENT',
-              title: '病例列表预览',
-              section: 'list'
-            }
-          },
-          {
-            path: 'detail',
-            name: 'preview-patient-records-detail',
-            component: () => import('@/views/patient/PatientRecordsView.vue'),
-            meta: {
-              preview: true,
-              previewUserType: 'PATIENT',
-              title: '病例详情预览',
-              section: 'detail'
-            }
-          }
-        ]
-      },
-      {
-        path: 'patient/registration',
-        name: 'preview-patient-registration',
-        component: () => import('@/views/patient/PatientRegistrationView.vue'),
-        meta: {
-          preview: true,
-          previewUserType: 'PATIENT',
-          title: '挂号排班预览'
-        }
-      },
-      {
-        path: 'patient/orders',
-        name: 'preview-patient-orders',
-        component: () => import('@/views/common/WorkspaceSectionOutlet.vue'),
-        meta: {
-          preview: true,
-          previewUserType: 'PATIENT',
-          title: '订单支付预览'
-        },
-        children: [
-          {
-            path: '',
-            redirect: '/preview/patient/orders/registrations'
-          },
-          {
-            path: 'registrations',
-            name: 'preview-patient-order-registrations',
-            component: () => import('@/views/patient/PatientOrdersView.vue'),
-            meta: {
-              preview: true,
-              previewUserType: 'PATIENT',
-              title: '我的挂号预览',
-              orderSection: 'registrations'
-            }
-          },
-          {
-            path: 'payments',
-            name: 'preview-patient-order-payments',
-            component: () => import('@/views/patient/PatientOrdersView.vue'),
-            meta: {
-              preview: true,
-              previewUserType: 'PATIENT',
-              title: '待支付预览',
-              orderSection: 'payments'
-            }
-          }
-        ]
-      },
-      {
-        path: 'patient/consult',
-        name: 'preview-patient-consult',
-        component: () => import('@/views/patient/PatientConsultView.vue'),
-        meta: {
-          preview: true,
-          previewUserType: 'PATIENT',
-          title: 'AI 问诊预览'
-        }
-      },
-      {
-        path: 'doctor/queue',
-        name: 'preview-doctor-queue',
-        component: () => import('@/views/doctor/DoctorQueueView.vue'),
-        meta: {
-          preview: true,
-          previewUserType: 'DOCTOR',
-          title: '候诊队列预览'
-        }
-      },
-      {
-        path: 'doctor/records',
-        name: 'preview-doctor-records',
-        component: () => import('@/views/common/WorkspaceSectionOutlet.vue'),
-        meta: {
-          preview: true,
-          previewUserType: 'DOCTOR',
-          title: '病历诊断预览'
-        },
-        children: [
-          {
-            path: '',
-            redirect: '/preview/doctor/records/consultation'
-          },
-          {
-            path: 'consultation',
-            name: 'preview-doctor-records-consultation',
-            component: () => import('@/views/doctor/DoctorRecordsView.vue'),
-            meta: {
-              preview: true,
-              previewUserType: 'DOCTOR',
-              title: '当前接诊预览',
-              section: 'consultation'
-            }
-          },
-          {
-            path: 'history',
-            name: 'preview-doctor-records-history',
-            component: () => import('@/views/doctor/DoctorRecordsView.vue'),
-            meta: {
-              preview: true,
-              previewUserType: 'DOCTOR',
-              title: '病历记录预览',
-              section: 'history'
-            }
-          }
-        ]
-      },
-      {
-        path: 'doctor/orders',
-        name: 'preview-doctor-orders',
-        component: () => import('@/views/common/WorkspaceSectionOutlet.vue'),
-        meta: {
-          preview: true,
-          previewUserType: 'DOCTOR',
-          title: '检查处方预览'
-        },
-        children: [
-          {
-            path: '',
-            redirect: '/preview/doctor/orders/check'
-          },
-          {
-            path: 'check',
-            name: 'preview-doctor-orders-check',
-            component: () => import('@/views/doctor/DoctorOrdersView.vue'),
-            meta: {
-              preview: true,
-              previewUserType: 'DOCTOR',
-              title: '检查申请预览',
-              orderSection: 'check'
-            }
-          },
-          {
-            path: 'inspection',
-            name: 'preview-doctor-orders-inspection',
-            component: () => import('@/views/doctor/DoctorOrdersView.vue'),
-            meta: {
-              preview: true,
-              previewUserType: 'DOCTOR',
-              title: '检验申请预览',
-              orderSection: 'inspection'
-            }
-          },
-          {
-            path: 'prescription',
-            name: 'preview-doctor-orders-prescription',
-            component: () => import('@/views/doctor/DoctorOrdersView.vue'),
-            meta: {
-              preview: true,
-              previewUserType: 'DOCTOR',
-              title: '处方发药预览',
-              orderSection: 'prescription'
-            }
-          }
-        ]
-      },
-      {
-        path: 'doctor/ct-analysis',
-        name: 'preview-doctor-ct-analysis',
-        component: () => import('@/views/doctor/DoctorCtAnalysisView.vue'),
-        meta: {
-          preview: true,
-          previewUserType: 'DOCTOR',
-          title: 'CT 分析预览'
-        }
-      },
-      {
-        path: 'management/departments',
-        name: 'preview-management-departments',
-        component: () => import('@/views/common/WorkspaceSectionOutlet.vue'),
-        meta: {
-          preview: true,
-          previewUserType: 'MANAGEMENT',
-          title: '科室医生预览'
-        },
-        children: [
-          {
-            path: '',
-            redirect: '/preview/management/departments/list'
-          },
-          {
-            path: 'list',
-            name: 'preview-management-department-list',
-            component: () => import('@/views/management/ManagementDepartmentsView.vue'),
-            meta: {
-              preview: true,
-              previewUserType: 'MANAGEMENT',
-              title: '科室列表预览',
-              section: 'departments'
-            }
-          },
-          {
-            path: 'doctors',
-            name: 'preview-management-doctor-list',
-            component: () => import('@/views/management/ManagementDepartmentsView.vue'),
-            meta: {
-              preview: true,
-              previewUserType: 'MANAGEMENT',
-              title: '医生分页预览',
-              section: 'doctors'
-            }
-          }
-        ]
-      },
-      {
-        path: 'management/schedules',
-        name: 'preview-management-schedules',
-        component: () => import('@/views/management/ManagementSchedulesView.vue'),
-        meta: {
-          preview: true,
-          previewUserType: 'MANAGEMENT',
-          title: '排班号源预览'
-        },
-        children: [
-          {
-            path: '',
-            redirect: '/preview/management/schedules/templates'
-          },
-          {
-            path: 'templates',
-            name: 'preview-management-schedule-templates',
-            component: () => import('@/views/management/ManagementScheduleTemplatesView.vue'),
-            meta: {
-              preview: true,
-              previewUserType: 'MANAGEMENT',
-              title: '排班模板预览'
-            }
-          },
-          {
-            path: 'instances',
-            name: 'preview-management-schedule-instances',
-            component: () => import('@/views/management/ManagementScheduleInstancesView.vue'),
-            meta: {
-              preview: true,
-              previewUserType: 'MANAGEMENT',
-              title: '排班实例预览'
-            }
-          }
-        ]
-      },
-      {
-        path: 'management/patients',
-        name: 'preview-management-patients',
-        component: () => import('@/views/management/ManagementPatientsView.vue'),
-        meta: {
-          preview: true,
-          previewUserType: 'MANAGEMENT',
-          title: '患者挂号预览'
-        }
-      },
-      {
-        path: 'management/assets',
-        name: 'preview-management-assets',
-        component: () => import('@/views/common/WorkspaceSectionOutlet.vue'),
-        meta: {
-          preview: true,
-          previewUserType: 'MANAGEMENT',
-          title: '资产文件预览'
-        },
-        children: [
-          {
-            path: '',
-            redirect: '/preview/management/assets/drugs'
-          },
-          {
-            path: 'drugs',
-            name: 'preview-management-assets-drugs',
-            component: () => import('@/views/management/ManagementAssetsView.vue'),
-            meta: {
-              preview: true,
-              previewUserType: 'MANAGEMENT',
-              title: '药品库存预览',
-              section: 'drugs'
-            }
-          },
-          {
-            path: 'files',
-            name: 'preview-management-assets-files',
-            component: () => import('@/views/management/ManagementAssetsView.vue'),
-            meta: {
-              preview: true,
-              previewUserType: 'MANAGEMENT',
-              title: '文件记录预览',
-              section: 'files'
-            }
-          },
-          {
-            path: 'knowledge',
-            name: 'preview-management-assets-knowledge',
-            component: () => import('@/views/management/ManagementAssetsView.vue'),
-            meta: {
-              preview: true,
-              previewUserType: 'MANAGEMENT',
-              title: '知识库上传预览',
               section: 'knowledge'
             }
           }
